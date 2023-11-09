@@ -61,9 +61,6 @@ def sample_one(key,
 
     max_interval = jnp.max(intervals)
     mask = (jnp.arange(T) >= t_go-mask_pad) & (jnp.arange(T) < t_go + max_interval + mask_pad)
-    # mask = (jnp.arange(T) >= t_go-mask_pad) & (jnp.arange(T) < t_go + interval + mask_pad)
-    # mask = jnp.ones((T, 1), dtype=bool)
-    # mask = mask.at[t_go-mask_pad:t_go+interval+mask_pad].set(True)
 
     return inputs, outputs[:, None], mask[:, None]
 

@@ -6,7 +6,7 @@ from jax import lax
 import optax
 import matplotlib.pyplot as plt
 
-
+# CODE FOR NM-RNN
 def nm_rnn(params, x0, z0, inputs, tau_x, tau_z, nln=jnp.tanh):
     """
     Arguments:
@@ -53,4 +53,39 @@ batched_nm_rnn = vmap(nm_rnn, in_axes=(None, None, None, 0, None, None))
 
 def batched_nm_rnn_loss(params, x0, z0, batch_inputs, tau_x, tau_z, batch_targets, batch_mask):
     ys, _, _ = batched_nm_rnn(params, x0, z0, batch_inputs, tau_x, tau_z)
+    return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)
+
+
+# CODE FOR LOW-RANK RNN
+def lr_rnn(params, x0, inputs, tau, nln=jnp.tanh):
+    """
+    Arguments:
+    - params
+    - x0
+    - inputs
+    - tau   : decay constant
+    """
+
+    U = params["row_factors"]       # D x R
+    V = params["column_factors"]    # D x R
+    B = params["input_weights"]     # D x M
+    C = params["readout_weights"]   # O x D
+
+    N = x0.shape[0]
+
+    def _step(x, u):
+        h = V.T @ nln(x)
+        x = (1.0 - (1. / tau)) * x + (1. / (tau * N)) * U @ h # divide by N
+        x += (1. / tau) * B @ u
+        y = C @ x
+        return x, (y, x)
+
+    _, (ys, xs) = lax.scan(_step, x0, inputs)
+
+    return ys, xs
+
+batched_lr_rnn = vmap(lr_rnn, in_axes=(None, None, 0, None))
+
+def batched_lr_rnn_loss(params, x0, batch_inputs, tau, batch_targets, batch_mask):
+    ys, _ = batched_lr_rnn(params, x0, batch_inputs, tau)
     return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)
