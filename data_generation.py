@@ -86,9 +86,8 @@ def sample_all(T,
     delay: length of time between measure and go
 
     Returns:
-    inputs: (T, 4) array of time series (measure, set, go, tonic cue) where
+    inputs: (T, 3) array of time series (measure, set, go, tonic cue) where
             measure, set, go are one-hot time series marking each event
-            tonic cue is constant context cue
 
     output: (T, 1) ramp starting at go and lasting (set - measure) time
 
