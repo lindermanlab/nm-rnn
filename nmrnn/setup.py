@@ -7,7 +7,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 DISTNAME = 'nmrnn'
 DESCRIPTION = 'Neuromodulated RNN models.'
-with open('README.md') as fp:
+with open('../README.md') as fp:
     LONG_DESCRIPTION = fp.read()
 MAINTAINER = 'Julia Costacurta'
 MAINTAINER_EMAIL = 'jcostac@stanford.edu'
