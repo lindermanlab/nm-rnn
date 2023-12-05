@@ -13,7 +13,7 @@ def sample_one(key,
                measure_min,
                measure_max,
                delay,
-               mask_pad,
+               mask_pad=None,
                output_min=-0.5,
                output_max=0.5):
     """
@@ -25,6 +25,8 @@ def sample_one(key,
     measure_min: minimum time when measure cue comes
     measure_max: maximum time when measure cue comes
     delay: length of time between measure and go
+    mask_pad: # indices that loss masks extends to on either side of ramp
+        if None, mask is all ones (no masking loss)
 
     Returns:
     inputs: (T, 3) array of time series (measure, set, go) where
@@ -32,7 +34,7 @@ def sample_one(key,
 
     output: (T, 1) ramp starting at go and lasting (set - measure) time
 
-    mask: (T, 1) binary mask over ramp +- 300 units of time
+    mask: (T, 1) binary mask over ramp +- mask_pad indices
 
     Note: outputs are aligned at *go* cue
     """
@@ -60,7 +62,8 @@ def sample_one(key,
     outputs = output_min + (output_max - output_min) * outputs
 
     max_interval = jnp.max(intervals)
-    mask = (jnp.arange(T) >= t_go-mask_pad) & (jnp.arange(T) < t_go + max_interval + mask_pad)
+    if mask_pad is not None: mask = (jnp.arange(T) >= t_go-mask_pad) & (jnp.arange(T) < t_go + max_interval + mask_pad)
+    else: mask = jnp.ones(T)
 
     return inputs, outputs[:, None], mask[:, None]
 
@@ -69,7 +72,7 @@ def sample_all(T,
                measure_min,
                measure_max,
                delay,
-               mask_pad,
+               mask_pad=None,
                output_min=-0.5,
                output_max=0.5):
     """
@@ -115,7 +118,8 @@ def sample_all(T,
         outputs = output_min + (output_max - output_min) * outputs
 
         # construct the mask
-        mask = (jnp.arange(T) >= t_go-mask_pad) & (jnp.arange(T) < t_go + max_interval + mask_pad)
+        if mask_pad is not None: mask = (jnp.arange(T) >= t_go-mask_pad) & (jnp.arange(T) < t_go + max_interval + mask_pad)
+        else: mask = jnp.ones(T)
 
         return inputs, outputs, mask
 

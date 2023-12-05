@@ -7,19 +7,16 @@ import optax
 
 import matplotlib.pyplot as plt
 
-def random_nmrnn_params(key, u, n, r, m, o):
-    """Generate random neuromodulated low-rank RNN parameters, with row and
-    column factors correlated as in Beiran et al
+def random_nmrnn_params(key, u, n, r, m, k, o, g=1.0):
+    """Generate random low-rank RNN parameters
 
     Arguments:
     u:  number of inputs
     n:  number of neurons in main network
     r:  rank of main network
     m:  number of neurons in NM network
+    k:  dimension of NM input affecting weight matrix (either 1 or r)
     o:  number of outputs
-
-    Returns:
-    dictionary of parameters for NM-RNN
     """
     skeys = jr.split(key, 8)
     #   hscale = 0.1
@@ -42,5 +39,5 @@ def random_nmrnn_params(key, u, n, r, m, o):
             'readout_weights' : jr.normal(skeys[3], (o,n))*pfactor,
             'nm_rec_weight' : jr.normal(skeys[4], (m,m))*0.1,
             'nm_input_weight' : jr.normal(skeys[5], (m,u))*ifactor,
-            'nm_sigmoid_weight' : jr.normal(skeys[6], (1,m))*0.1,
-            'nm_sigmoid_intercept' : jr.normal(skeys[7], ())*0.1}
+            'nm_sigmoid_weight' : jr.normal(skeys[6], (k,m))*0.1,
+            'nm_sigmoid_intercept' : jr.normal(skeys[7], (k,))*0.1}

@@ -89,3 +89,7 @@ batched_lr_rnn = vmap(lr_rnn, in_axes=(None, None, 0, None))
 def batched_lr_rnn_loss(params, x0, batch_inputs, tau, batch_targets, batch_mask):
     ys, _ = batched_lr_rnn(params, x0, batch_inputs, tau)
     return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)
+
+def batched_nm_rnn_loss_frozen(nm_params, other_params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks):
+    params = dict(nm_params, **other_params)
+    return batched_nm_rnn_loss(params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks)

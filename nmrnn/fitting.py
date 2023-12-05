@@ -6,10 +6,10 @@ from jax import lax
 import optax
 import matplotlib.pyplot as plt
 
-from data_generation import sample_one
-from rnn_code import batched_nm_rnn_loss, nm_rnn, batched_lr_rnn_loss, lr_rnn
+from nmrnn.data_generation import sample_one
+from nmrnn.rnn_code import batched_nm_rnn_loss, nm_rnn, batched_lr_rnn_loss, lr_rnn, batched_nm_rnn_loss_frozen
 
-def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_iters, tau_x, tau_z): # training on full set of data
+def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_iters, tau_x, tau_z, plots=True): # training on full set of data
     opt_state = optimizer.init(params)
     N_data = inputs.shape[0]
 
@@ -29,21 +29,22 @@ def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_i
     for n in range(num_iters//1000):
         (params,_), (_, loss_values) = lax.scan(_step, (params, opt_state), None, length=1000) #arange bc the inputs aren't changing
         losses.append(loss_values)
-        print(f'step {n*1000}, loss: {loss_values[-1]}')
+        print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
         ys, _, zs = nm_rnn(params, x0, z0, sample_inputs, tau_x, tau_z)
 
-        # plt.figure(figsize=[10,6])
-        fig, (ax0, ax1) = plt.subplots(2, 1, figsize=[10,6])
-        # ax0.xlabel('Timestep')
-        ax0.plot(sample_targets, label='True target')
-        ax0.plot(ys, label='RNN target')
-        ax0.legend()
-        ax1.set_xlabel('Timestep')
-        m = params['nm_sigmoid_weight']
-        b = params['nm_sigmoid_intercept']
-        ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
-        # ax1.legend()
-        plt.pause(0.1)
+        if plots:
+            # plt.figure(figsize=[10,6])
+            fig, (ax0, ax1) = plt.subplots(2, 1, figsize=[10,6])
+            # ax0.xlabel('Timestep')
+            ax0.plot(sample_targets, label='True target')
+            ax0.plot(ys, label='RNN target')
+            ax0.legend()
+            ax1.set_xlabel('Timestep')
+            m = params['nm_sigmoid_weight']
+            b = params['nm_sigmoid_intercept']
+            ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
+            # ax1.legend()
+            plt.pause(0.1)
 
     return params, losses
 
@@ -70,7 +71,7 @@ def fit_mwg_lr_rnn(inputs, targets, loss_masks, params, optimizer, x0, num_iters
         (params,_), (_, loss_values) = lax.scan(_step, (params, opt_state), None, length=1000) #arange bc the inputs aren't changing
         losses.append(loss_values)
         # if n % 100 == 0:
-        print(f'step {n*1000}, loss: {loss_values[-1]}')
+        print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
         ys, _ = lr_rnn(params, x0, sample_inputs, tau)
 
         plt.figure(figsize=[10,6])
@@ -79,5 +80,45 @@ def fit_mwg_lr_rnn(inputs, targets, loss_masks, params, optimizer, x0, num_iters
         plt.plot(ys, label='RNN target')
         plt.legend()
         plt.pause(0.1)
+
+    return params, losses
+
+def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimizer, x0, z0, num_iters, tau_x, tau_z, plots=True): # training on full set of data
+    opt_state = optimizer.init(nm_params)
+    N_data = inputs.shape[0]
+
+    @jit
+    def _step(params_and_opt, input):
+        (nm_params, opt_state) = params_and_opt
+        #pdb.set_breakpoint()
+        loss_value, grads = jax.value_and_grad(batched_nm_rnn_loss_frozen)(nm_params, other_params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks)
+        updates, opt_state = optimizer.update(grads, opt_state, nm_params)
+        nm_params = optax.apply_updates(nm_params, updates)
+        return (nm_params, opt_state), (nm_params, loss_value)
+
+    losses = []
+    sample_inputs, sample_targets, sample_masks = inputs[0], targets[0], loss_masks[0]  # grab a single trial to plot output
+    for n in range(num_iters//1000):
+        # (params, opt_state), loss_value = _step((params, opt_state))
+        (nm_params,_), (_, loss_values) = lax.scan(_step, (nm_params, opt_state), None, length=1000) #arange bc the inputs aren't changing
+        losses.append(loss_values)
+        # if n % 100 == 0:
+        print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
+        params = dict(nm_params, **other_params)
+        ys, _, zs = nm_rnn(params, x0, z0, sample_inputs, tau_x, tau_z)
+
+        if plots:
+            # plt.figure(figsize=[10,6])
+            fig, (ax0, ax1) = plt.subplots(2, 1, figsize=[10,6])
+            # ax0.xlabel('Timestep')
+            ax0.plot(sample_targets, label='True target')
+            ax0.plot(ys, label='RNN target')
+            ax0.legend()
+            ax1.set_xlabel('Timestep')
+            m = params['nm_sigmoid_weight']
+            b = params['nm_sigmoid_intercept']
+            ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
+            # ax1.legend()
+            plt.pause(0.1)
 
     return params, losses
