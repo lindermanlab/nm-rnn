@@ -35,10 +35,11 @@ def nm_rnn(params, x0, z0, inputs, tau_x, tau_z, nln=jnp.tanh):
         z += (1. / tau_z) * B_zu @ u
 
         # update x
+        xp = x # hold onto previous value
         s = jax.nn.sigmoid(m @ z + c)
-        x = (1.0 - (1. / tau_x)) * x
-        h = V.T @ nln(x)
-        x += (1. / (tau_x * N)) * (U * s) @ h # divide by N
+        x = (1.0 - (1. / tau_x)) * xp
+        h = V.T @ nln(xp)
+        x += (1. / (tau_x * N)) * (U * s) @ h  # divide by N
         x += (1. / tau_x) * B_xu @ u
 
         # calculate y
