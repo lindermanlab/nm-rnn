@@ -4,6 +4,9 @@ import jax.random as jr
 from jax import grad, vmap, jit
 from jax import lax
 import optax
+import wandb
+import os
+import pickle
 
 import matplotlib.pyplot as plt
 
@@ -41,3 +44,16 @@ def random_nmrnn_params(key, u, n, r, m, k, o, g=1.0):
             'nm_input_weight' : jr.normal(skeys[5], (m,u))*ifactor,
             'nm_sigmoid_weight' : jr.normal(skeys[6], (k,m))*0.1,
             'nm_sigmoid_intercept' : jr.normal(skeys[7], (k,))*0.1}
+
+
+def log_wandb_model(model, name, type):
+    trained_model_artifact = wandb.Artifact(name,type=type)
+    if not os.path.isdir('models'): os.mkdir('models')
+    subdirectory = wandb.run.name
+    filepath = os.path.join('models', subdirectory)
+    os.mkdir(filepath)
+    obs_outfile = open(os.path.join(filepath, "model"), 'wb')
+    pickle.dump(model, obs_outfile)
+    obs_outfile.close()
+    trained_model_artifact.add_dir(filepath)
+    wandb.log_artifact(trained_model_artifact)

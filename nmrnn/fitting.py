@@ -4,12 +4,16 @@ import jax.random as jr
 from jax import grad, vmap, jit
 from jax import lax
 import optax
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
+import wandb
 
 from nmrnn.data_generation import sample_one
 from nmrnn.rnn_code import batched_nm_rnn_loss, nm_rnn, batched_lr_rnn_loss, lr_rnn, batched_nm_rnn_loss_frozen
 
-def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_iters, tau_x, tau_z, plots=True): # training on full set of data
+def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_iters, tau_x, tau_z,
+                   plots=True, wandb_log=False, final_wandb_plot=False): # training on full set of data
     opt_state = optimizer.init(params)
     N_data = inputs.shape[0]
 
@@ -30,6 +34,8 @@ def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_i
         (params,_), (_, loss_values) = lax.scan(_step, (params, opt_state), None, length=1000) #arange bc the inputs aren't changing
         losses.append(loss_values)
         print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
+        if wandb_log: wandb.log({'loss':loss_values[-1]})
+
         ys, _, zs = nm_rnn(params, x0, z0, sample_inputs, tau_x, tau_z)
 
         if plots:
@@ -45,6 +51,19 @@ def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_i
             ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
             # ax1.legend()
             plt.pause(0.1)
+
+    if final_wandb_plot:
+        fig, (ax0, ax1) = plt.subplots(2, 1, figsize=[10, 6])
+        # ax0.xlabel('Timestep')
+        ax0.plot(sample_targets, label='True target')
+        ax0.plot(ys, label='RNN target')
+        ax0.legend()
+        ax1.set_xlabel('Timestep')
+        m = params['nm_sigmoid_weight']
+        b = params['nm_sigmoid_intercept']
+        ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
+        # ax1.legend()
+        wandb.log({'final_curves':wandb.Image(fig)}, commit=True)
 
     return params, losses
 
@@ -83,7 +102,8 @@ def fit_mwg_lr_rnn(inputs, targets, loss_masks, params, optimizer, x0, num_iters
 
     return params, losses
 
-def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimizer, x0, z0, num_iters, tau_x, tau_z, plots=True): # training on full set of data
+def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimizer, x0, z0, num_iters, tau_x, tau_z,
+                    plots=True, wandb_log=False, final_wandb_plot=False): # training on full set of data
     opt_state = optimizer.init(nm_params)
     N_data = inputs.shape[0]
 
@@ -104,6 +124,8 @@ def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimi
         losses.append(loss_values)
         # if n % 100 == 0:
         print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
+        if wandb_log: wandb.log({'loss':loss_values[-1]})
+
         params = dict(nm_params, **other_params)
         ys, _, zs = nm_rnn(params, x0, z0, sample_inputs, tau_x, tau_z)
 
@@ -120,5 +142,19 @@ def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimi
             ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
             # ax1.legend()
             plt.pause(0.1)
+
+    if final_wandb_plot:
+        # plt.figure(figsize=[10,6])
+        fig, (ax0, ax1) = plt.subplots(2, 1, figsize=[10, 6])
+        # ax0.xlabel('Timestep')
+        ax0.set_title('after training nm only')
+        ax0.plot(sample_targets, label='True target')
+        ax0.plot(ys, label='RNN target')
+        ax0.legend()
+        ax1.set_xlabel('Timestep')
+        m = params['nm_sigmoid_weight']
+        b = params['nm_sigmoid_intercept']
+        ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
+        wandb.log({'nm_only_curves':wandb.Image(fig)}, commit=True)
 
     return params, losses
