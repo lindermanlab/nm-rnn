@@ -17,11 +17,11 @@ from nmrnn.rnn_code import batched_nm_rnn
 default_config = dict(
     # model parameters
     N = 100,    # hidden state dim
-    R = 3,      # rank of RNN
+    R = 2,      # rank of RNN
     U = 3,      # input dim
     O = 1,      # output dimension
     M = 5,      # NM dimension
-    K = 3,      # NM sigmoid dimension
+    K = 2,      # NM sigmoid dimension (must be 1 or R)
     # Model Hyperparameters
     tau_x = 10,
     tau_z = 100,
@@ -107,15 +107,6 @@ fig, axes = plt.subplots(config['R'], 1, figsize=[10,config['R']*2])
 for r, ax in enumerate(axes):
     for i in range(12):
         ax.plot(jax.nn.sigmoid((zs @ m.T + b)[i, :, r]))
-# ax0.set_title('NM signals aligned to time 0')
-# for i in range(12):
-#     ax0.plot(jax.nn.sigmoid((zs @ m.T + b)[i,:,0]))
-#
-# for i in range(12):
-#     ax1.plot(jax.nn.sigmoid((zs @ m.T + b)[i,:,1]))
-#
-# for i in range(12):
-#     ax2.plot(jax.nn.sigmoid((zs @ m.T + b)[i,:,2]))
 
 wandb.log({'nm_aligned_0':wandb.Image(fig)}, commit=True)
 
@@ -132,14 +123,6 @@ fig, axes = plt.subplots(config['R'], 1, figsize=[10,config['R']*2])
 for r, ax in enumerate(axes):
     for i in range(12):
         ax.plot(jax.nn.sigmoid((zs @ m.T + b)[i, :, r])[go_mask[i]])
-# for i in range(12):
-#     ax0.plot(jax.nn.sigmoid((zs @ m.T + b)[i,:,0])[go_mask[i]])
-#
-# for i in range(12):
-#     ax1.plot(jax.nn.sigmoid((zs @ m.T + b)[i,:,1])[go_mask[i]])
-#
-# for i in range(12):
-#     ax2.plot(jax.nn.sigmoid((zs @ m.T + b)[i,:,2])[go_mask[i]])
 
 wandb.log({'nm_aligned_go':wandb.Image(fig)}, commit=True)
 
@@ -165,28 +148,5 @@ for i, ax in enumerate(axes):
         ax.axvline(x=go, c='k', ls='--', alpha=0.7)
         ax.axvline(x=ramp_end, c='k', ls='--', alpha=0.7)
 
-# ax0.plot(new_outputs[6,:,0], c='k')
-# ax0.axvline(x=measure, c='k', ls='--', alpha=0.7)
-# ax0.axvline(x=wait, c='k', ls='--', alpha=0.7)
-# ax0.axvline(x=go, c='k', ls='--', alpha=0.7)
-# ax0.axvline(x=ramp_end, c='k', ls='--', alpha=0.7)
-#
-# ax1.plot(jax.nn.sigmoid((zs @ m.T + b)[6,:,0].T), c='b', lw=2)
-# ax1.axvline(x=measure, c='k', ls='--', alpha=0.7)
-# ax1.axvline(x=wait, c='k', ls='--', alpha=0.7)
-# ax1.axvline(x=go, c='k', ls='--', alpha=0.7)
-# ax1.axvline(x=ramp_end, c='k', ls='--', alpha=0.7)
-#
-# ax2.plot(jax.nn.sigmoid((zs @ m.T + b)[6,:,1].T), c='b', lw=2)
-# ax2.axvline(x=measure, c='k', ls='--', alpha=0.7)
-# ax2.axvline(x=wait, c='k', ls='--', alpha=0.7)
-# ax2.axvline(x=go, c='k', ls='--', alpha=0.7)
-# ax2.axvline(x=ramp_end, c='k', ls='--', alpha=0.7)
-#
-# ax3.plot(jax.nn.sigmoid((zs @ m.T + b)[6,:,2].T), c='b', lw=2)
-# ax3.axvline(x=measure, c='k', ls='--', alpha=0.7)
-# ax3.axvline(x=wait, c='k', ls='--', alpha=0.7)
-# ax3.axvline(x=go, c='k', ls='--', alpha=0.7)
-# ax3.axvline(x=ramp_end, c='k', ls='--', alpha=0.7)
 
 wandb.log({'single_output':wandb.Image(fig)}, commit=True)
