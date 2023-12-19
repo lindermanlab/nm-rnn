@@ -36,8 +36,8 @@ def nm_rnn(params, x0, z0, inputs, tau_x, tau_z, nln=jnp.tanh):
 
         # update x
         xp = x # hold onto previous value
-        s = jax.nn.sigmoid(m @ z + c)
-        x = (1.0 - (1. / tau_x)) * xp
+        s = jax.nn.sigmoid(m @ z + c) # calculate nm signal
+        x = (1.0 - (1. / tau_x)) * xp # decay term
         h = V.T @ nln(xp)
         x += (1. / (tau_x * N)) * (U * s) @ h  # divide by N
         x += (1. / tau_x) * B_xu @ u
