@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #SBATCH --job-name=nmrnn
-#SBATCH --partition=normal,hns, swl1
+#SBATCH --partition=normal,hns
 #SBATCH --time=4:0:0
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
