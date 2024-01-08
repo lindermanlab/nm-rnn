@@ -82,7 +82,7 @@ params, losses = fit_mwg_nm_rnn(all_inputs, all_outputs, all_masks,
 # log model
 log_wandb_model(params, "nmrnn_r{}_n{}_m{}".format(config['R'],config['N'],config['M']), 'model')
 
-# more plots/metrics to analyze model generalization
+################## more plots/metrics to analyze model generalization
 
 # generate data for all intervals (4 trained, plus 4 shorter/longer)
 new_intervals = jnp.array([[4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26]])
@@ -98,7 +98,7 @@ new_inputs, new_outputs, new_masks = sample_all(config['T'],
 
 ys, _, zs = batched_nm_rnn(params, x0, z0, new_inputs, config['tau_x'], config['tau_z'])
 
-# plot aligned to start
+################## plot aligned to start
 m = params['nm_sigmoid_weight']
 b = params['nm_sigmoid_intercept']
 
@@ -110,7 +110,7 @@ for r, ax in enumerate(axes):
 
 wandb.log({'nm_aligned_0':wandb.Image(fig)}, commit=True)
 
-# plot aligned to go cue
+################## plot aligned to go cue
 go_cues = jnp.where(new_inputs[:,:,2])[1]
 go_mask = jnp.zeros((12, 110), dtype=bool)
 ind_range = jnp.arange(110)
@@ -126,7 +126,7 @@ for r, ax in enumerate(axes):
 
 wandb.log({'nm_aligned_go':wandb.Image(fig)}, commit=True)
 
-# single split plot also showing desired output
+################## single split plot also showing desired output
 fig, axes = plt.subplots(config['R'] + 1, 1, figsize=[10,config['R']*2+2], sharex=True)
 
 measure = jnp.where(new_inputs[6,:,0]>0)
@@ -148,5 +148,23 @@ for i, ax in enumerate(axes):
         ax.axvline(x=go, c='k', ls='--', alpha=0.7)
         ax.axvline(x=ramp_end, c='k', ls='--', alpha=0.7)
 
-
 wandb.log({'single_output':wandb.Image(fig)}, commit=True)
+
+################## generalization plots
+N = new_intervals.shape[1]
+# plt.rcParams["axes.prop_cycle"] = plt.cycler("color", plt.cm.brg(jnp.linspace(0,1,N)))
+
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(5, 5), sharey=True, sharex=True)
+for i in [4, 5, 6, 7]:
+    ax1.plot(new_outputs[i][new_masks[i].astype(bool)], 'k--', alpha=0.7)
+    ax1.plot(ys[i][new_masks[i].astype(bool)], c='tab:purple')
+
+for i in [0, 1, 2, 3]:
+    ax2.plot(new_outputs[i][new_masks[i].astype(bool)], 'k--', alpha=0.7)
+    ax2.plot(ys[i][new_masks[i].astype(bool)], c='tab:red')
+
+for i in [8,9,10,11]:
+    ax2.plot(new_outputs[i][new_masks[i].astype(bool)], 'k--', alpha=0.7)
+    ax2.plot(ys[i][new_masks[i].astype(bool)], c='tab:blue')
+
+wandb.log({'generalization_output': wandb.Image(fig)}, commit=True)
