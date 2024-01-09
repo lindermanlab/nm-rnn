@@ -3,8 +3,8 @@ import jax.numpy as jnp
 import jax.random as jr
 import optax
 
-import matplotlib
-matplotlib.use('TkAgg')
+# import matplotlib
+# matplotlib.use('TkAgg') # need this on my machine for some reason
 import matplotlib.pyplot as plt
 import wandb
 
