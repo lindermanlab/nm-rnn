@@ -4,8 +4,8 @@ import jax.random as jr
 from jax import grad, vmap, jit
 from jax import lax
 import optax
-import matplotlib
-matplotlib.use('TkAgg')
+# import matplotlib
+# matplotlib.use('TkAgg') # need these on my machine for some reason
 import matplotlib.pyplot as plt
 import wandb
 
