@@ -23,7 +23,7 @@ numpy==1.26.1
 opt-einsum==3.3.0
 optax==0.1.7
 packaging==23.2
-Pillow==10.1.0
+Pillow>=10.2.0
 protobuf==4.25.1
 psutil==5.9.6
 pyparsing==3.1.1
