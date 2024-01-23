@@ -1,3 +1,4 @@
+# in addition to the below packages, also install this nmrnn package from source
 absl-py==2.0.0
 appdirs==1.4.4
 certifi==2023.11.17
@@ -18,7 +19,6 @@ jaxlib==0.4.20
 kiwisolver==1.4.5
 matplotlib==3.8.2
 ml-dtypes==0.3.1
--e git+https://github.com/lindermanlab/nm-rnn@41f1f1d35c6ff461487c4e9fadd80a66d8a02a1e#egg=nmrnn&subdirectory=nmrnn
 numpy==1.26.1
 opt-einsum==3.3.0
 optax==0.1.7
