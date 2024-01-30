@@ -1,3 +1,4 @@
+# in addition to the below packages, also install this nmrnn package from source
 absl-py==2.0.0
 appdirs==1.4.4
 certifi==2023.11.17
@@ -9,7 +10,7 @@ cycler==0.12.1
 docker-pycreds==0.4.0
 fonttools==4.44.0
 gitdb==4.0.11
-GitPython==3.1.40
+GitPython>=3.1.41
 idna==3.6
 importlib-metadata==6.8.0
 importlib-resources==6.1.1
@@ -18,12 +19,11 @@ jaxlib==0.4.20
 kiwisolver==1.4.5
 matplotlib==3.8.2
 ml-dtypes==0.3.1
--e git+https://github.com/lindermanlab/nm-rnn@41f1f1d35c6ff461487c4e9fadd80a66d8a02a1e#egg=nmrnn&subdirectory=nmrnn
 numpy==1.26.1
 opt-einsum==3.3.0
 optax==0.1.7
 packaging==23.2
-Pillow==10.1.0
+Pillow>=10.2.0
 protobuf==4.25.1
 psutil==5.9.6
 pyparsing==3.1.1
