@@ -21,7 +21,8 @@ default_config = dict(
     U = 3,      # input dim
     O = 1,      # output dimension
     M = 5,      # NM dimension
-    K = 2,      # NM sigmoid dimension (must be 1 or R)
+    # got rid of K for now, set to R by default
+    #K = 2,      # NM sigmoid dimension (must be 1 or R)
     # Model Hyperparameters
     tau_x = 10,
     tau_z = 100,
@@ -63,7 +64,7 @@ z0 = jnp.ones((config['M'],))*0.1
 
 # generate random initial parameters
 init_params = random_nmrnn_params(key, config['U'], config['N'], config['R'],
-                                  config['M'], config['K'], config['O'])
+                                  config['M'], config['R'], config['O'])
 
 # split parameters for now (only train on nm params to start)
 nm_params = {k: init_params[k] for k in ('readout_weights', 'nm_rec_weight', 'nm_input_weight', 'nm_sigmoid_weight', 'nm_sigmoid_intercept')}
