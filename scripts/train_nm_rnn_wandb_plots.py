@@ -36,6 +36,7 @@ default_config = dict(
     delay = 15,
     # Training
     num_lr_only_iters = 10_000,
+    num_nm_only_iters = 10_000,
     num_full_train_iters = 10_000,
     keyind = 13,
 )
