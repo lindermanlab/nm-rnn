@@ -173,7 +173,7 @@ def fit_mwg_lr_only(inputs, targets, loss_masks, nm_params, lr_params, optimizer
         #pdb.set_breakpoint()
         loss_value, grads = jax.value_and_grad(batched_nm_rnn_loss_frozen)(lr_params, nm_params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks)
         updates, opt_state = optimizer.update(grads, opt_state, lr_params)
-        nm_params = optax.apply_updates(lr_params, updates)
+        lr_params = optax.apply_updates(lr_params, updates)
         return (lr_params, opt_state), (lr_params, loss_value)
 
     losses = []
