@@ -164,7 +164,7 @@ def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimi
 # training function to fit only low-rank parameters 
 def fit_mwg_lr_only(inputs, targets, loss_masks, nm_params, lr_params, optimizer, x0, z0, num_iters, tau_x, tau_z,
                     plots=False, wandb_log=False, final_wandb_plot=False): # training on full set of data
-    opt_state = optimizer.init(nm_params)
+    opt_state = optimizer.init(lr_params)
     N_data = inputs.shape[0]
 
     @jit
@@ -182,7 +182,7 @@ def fit_mwg_lr_only(inputs, targets, loss_masks, nm_params, lr_params, optimizer
         # (params, opt_state), loss_value = _step((params, opt_state))
         (lr_params,_), (_, loss_values) = lax.scan(_step, (lr_params, opt_state), None, length=1000) #arange bc the inputs aren't changing
         losses.append(loss_values)
-        # if n % 100 == 0:
+        # if n % 100 ç== 0:
         print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
         if wandb_log: wandb.log({'loss':loss_values[-1]})
 
