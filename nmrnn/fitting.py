@@ -169,7 +169,7 @@ def fit_mwg_lr_only(inputs, targets, loss_masks, nm_params, lr_params, optimizer
 
     @jit
     def _step(params_and_opt, input):
-        (nm_params, opt_state) = params_and_opt
+        (lr_params, opt_state) = params_and_opt
         #pdb.set_breakpoint()
         loss_value, grads = jax.value_and_grad(batched_nm_rnn_loss_frozen)(nm_params, lr_params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks)
         updates, opt_state = optimizer.update(grads, opt_state, lr_params)
