@@ -57,3 +57,11 @@ def log_wandb_model(model, name, type):
     obs_outfile.close()
     trained_model_artifact.add_dir(filepath)
     wandb.log_artifact(trained_model_artifact)
+
+def load_wandb_model(filepath):
+    artifact = wandb.use_artifact(filepath, type="model")
+    artifact_dir = artifact.download()
+    model_infile = open(os.path.join(artifact_dir, "model"), 'rb')
+    model = pickle.load(model_infile)
+    model_infile.close()
+    return model
