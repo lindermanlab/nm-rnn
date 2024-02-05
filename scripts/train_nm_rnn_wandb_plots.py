@@ -35,9 +35,9 @@ default_config = dict(
     intervals = [[12, 14, 16, 18]],
     delay = 15,
     # Training
-    num_lr_only_iters = 10_000,
-    num_nm_only_iters = 10_000,
-    num_full_train_iters = 10_000,
+    num_lr_only_iters = 10_000, # if 0, skip lr-only training step
+    num_nm_only_iters = 10_000, # if 0, skip nm-only training step
+    num_full_train_iters = 50_000,
     keyind = 13,
 )
 
@@ -71,14 +71,17 @@ init_params = random_nmrnn_params(key, config['U'], config['N'], config['R'],
 nm_params = {k: init_params[k] for k in ('nm_rec_weight', 'nm_input_weight', 'nm_sigmoid_weight', 'nm_sigmoid_intercept')}
 lr_params = {k: init_params[k] for k in ('row_factors', 'column_factors', 'input_weights', 'readout_weights')}
 
-# # train on nm params only for a bit
-# params, nm_only_losses = fit_mwg_nm_only(all_inputs, all_outputs, all_masks, nm_params,
-#                                  lr_params, optimizer, x0, z0, config['num_nm_only_iters'],
-#                                          config['tau_x'], config['tau_z'], plots=False, wandb_log=True, final_wandb_plot=False)
+if config['num_lr_only_iters'] != 0:
+    params, lr_only_losses = fit_mwg_lr_only(all_inputs, all_outputs, all_masks, nm_params,
+                                    lr_params, optimizer, x0, z0, config['num_lr_only_iters'],
+                                            config['tau_x'], config['tau_z'], plots=False, wandb_log=True, final_wandb_plot=False)
+    lr_params = {k: params[k] for k in ('row_factors', 'column_factors', 'input_weights', 'readout_weights')}
 
-params, lr_only_losses = fit_mwg_lr_only(all_inputs, all_outputs, all_masks, nm_params,
-                                 lr_params, optimizer, x0, z0, config['num_lr_only_iters'],
-                                         config['tau_x'], config['tau_z'], plots=False, wandb_log=True, final_wandb_plot=False)
+if config['num_nm_only_iters'] != 0:
+# # train on nm params only for a bit
+    params, nm_only_losses = fit_mwg_nm_only(all_inputs, all_outputs, all_masks, nm_params,
+                                    lr_params, optimizer, x0, z0, config['num_nm_only_iters'],
+                                            config['tau_x'], config['tau_z'], plots=False, wandb_log=True, final_wandb_plot=False)
 
 # train on all params
 params, losses = fit_mwg_nm_rnn(all_inputs, all_outputs, all_masks,
