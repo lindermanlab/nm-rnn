@@ -42,7 +42,7 @@ default_config = dict(
 )
 
 # wandb stuff
-projectname = "nm-rnn-mwg"
+projectname = "nm-rnn-simple"
 wandb.init(config=default_config, project=projectname, entity='nm-rnn')
 config = wandb.config
 
