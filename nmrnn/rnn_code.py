@@ -94,3 +94,56 @@ def batched_lr_rnn_loss(params, x0, batch_inputs, tau, batch_targets, batch_mask
 def batched_nm_rnn_loss_frozen(nm_params, other_params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks):
     params = dict(nm_params, **other_params)
     return batched_nm_rnn_loss(params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks)
+
+
+# CODE FOR LINEAR SYMMETRIC NM-RNN
+
+def lin_sym_nm_rnn(params, x0, z0, inputs, tau_x, tau_z):
+    """
+    Arguments:
+    - params
+    - x0
+    - inputs
+    - tau   : decay constant
+    """
+
+    U = params["row_factors"]       # D x R
+    U, _ = jnp.linalg.qr(U) # orthogonalize
+    V = U    # D x R
+    B_xu = params["input_weights"]     # D x M
+    C = params["readout_weights"]   # O x D
+    W_zz = params["nm_rec_weight"]         # dim_nm x dim_nm
+    B_zu = params["nm_input_weight"]      # dim_nm x M
+    m = params["nm_sigmoid_weight"]         # scalar
+    c = params["nm_sigmoid_intercept"]      # scalar
+
+    N = x0.shape[0]
+
+    def _step(x_and_z, u):
+        x, z = x_and_z
+
+        # update z
+        z = (1.0 - (1. / tau_z)) * z + (1. / tau_z) * W_zz @ jnp.tanh(z) # remove this?
+        z += (1. / tau_z) * B_zu @ u
+
+        # update x
+        xp = x # hold onto previous value
+        s = jax.nn.sigmoid(m @ z + c) # calculate nm signal
+        x = (1.0 - (1. / tau_x)) * xp # decay term
+        h = V.T @ xp
+        x += (1. / tau_x) * (U * s) @ h  # divide by N
+        x += (1. / tau_x) * B_xu @ u
+
+        # calculate y
+        y = C @ x
+        return (x, z), (y, x, z)
+
+    _, (ys, xs, zs) = lax.scan(_step, (x0, z0), inputs)
+
+    return ys, xs, zs
+
+batched_lin_sym_nm_rnn = vmap(lin_sym_nm_rnn, in_axes=(None, None, None, 0, None, None))
+
+def batched_lin_sym_nm_rnn_loss(params, x0, z0, batch_inputs, tau_x, tau_z, batch_targets, batch_mask):
+    ys, _, _ = batched_lin_sym_nm_rnn(params, x0, z0, batch_inputs, tau_x, tau_z)
+    return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)

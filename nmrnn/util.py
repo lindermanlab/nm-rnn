@@ -30,11 +30,14 @@ def random_nmrnn_params(key, u, n, r, m, k, o, g=1.0):
     row_factors = jnp.zeros((n,r))
     column_factors = jnp.zeros((n,r))
 
-    for i in range(r):
-        sample = jr.multivariate_normal(key, jnp.zeros((2,)), jnp.array([[1.,0.8],[0.8,1.]]), shape=(n,))
-        # pdb.set_trace()
-        row_factors = row_factors.at[:,i].set(sample[:,0])
-        column_factors = column_factors.at[:,i].set(sample[:,1])
+    row_factors = jr.normal(skeys[0],(n,r))
+    column_factors = jr.normal(skeys[1],(n,r))
+
+    # for i in range(r): #TODO: split key
+    #     sample = jr.multivariate_normal(key, jnp.zeros((2,)), jnp.array([[1.,0.8],[0.8,1.]]), shape=(n,))
+    #     # pdb.set_trace()
+    #     row_factors = row_factors.at[:,i].set(sample[:,0])
+    #     column_factors = column_factors.at[:,i].set(sample[:,1])
 
     return {'row_factors' : row_factors,
             'column_factors' : column_factors,

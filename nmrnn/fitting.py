@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import wandb
 
 from nmrnn.data_generation import sample_one
-from nmrnn.rnn_code import batched_nm_rnn_loss, nm_rnn, batched_lr_rnn_loss, lr_rnn, batched_nm_rnn_loss_frozen
+from nmrnn.rnn_code import batched_nm_rnn_loss, nm_rnn, batched_lr_rnn_loss, lr_rnn, batched_nm_rnn_loss_frozen, lin_sym_nm_rnn, batched_lin_sym_nm_rnn_loss
 
 def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_iters, tau_x, tau_z,
                    plots=True, wandb_log=False, final_wandb_plot=False): # training on full set of data
@@ -68,7 +68,7 @@ def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_i
     return params, losses
 
 
-def fit_mwg_lr_rnn(inputs, targets, loss_masks, params, optimizer, x0, num_iters, tau): # training on full set of data
+def fit_mwg_lr_rnn(inputs, targets, loss_masks, params, optimizer, x0, num_iters, tau, plots=False): # training on full set of data
     opt_state = optimizer.init(params)
     N_data = inputs.shape[0]
 
@@ -93,12 +93,13 @@ def fit_mwg_lr_rnn(inputs, targets, loss_masks, params, optimizer, x0, num_iters
         print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
         ys, _ = lr_rnn(params, x0, sample_inputs, tau)
 
-        plt.figure(figsize=[10,6])
-        plt.xlabel('Timestep')
-        plt.plot(sample_targets, label='True target')
-        plt.plot(ys, label='RNN target')
-        plt.legend()
-        plt.pause(0.1)
+        if plots:
+            plt.figure(figsize=[10,6])
+            plt.xlabel('Timestep')
+            plt.plot(sample_targets, label='True target')
+            plt.plot(ys, label='RNN target')
+            plt.legend()
+            plt.pause(0.1)
 
     return params, losses
 
@@ -216,5 +217,41 @@ def fit_mwg_lr_only(inputs, targets, loss_masks, nm_params, lr_params, optimizer
         b = params['nm_sigmoid_intercept']
         ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
         wandb.log({'nm_only_curves':wandb.Image(fig)}, commit=True)
+
+    return params, losses
+
+# training function for simplified case
+def fit_lin_sym_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_iters, tau_x, tau_z): # training on full set of data
+    opt_state = optimizer.init(params)
+    N_data = inputs.shape[0]
+
+    @jit
+    def _step(params_and_opt, input):
+        (params, opt_state) = params_and_opt
+        #pdb.set_breakpoint()
+        loss_value, grads = jax.value_and_grad(batched_lin_sym_nm_rnn_loss)(params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks)
+        updates, opt_state = optimizer.update(grads, opt_state, params)
+        params = optax.apply_updates(params, updates)
+        return (params, opt_state), (params, loss_value)
+
+    losses = []
+    # sample_inputs, sample_targets, sample_masks = sample_one(jr.PRNGKey(1), T, intervals, measure_min, measure_max, delay, mask_pad)
+    sample_inputs, sample_targets, sample_masks = inputs[0], targets[0], loss_masks[0] # grab a single trial to plot output
+
+    fig = plt.figure(figsize=[10,6])
+    for n in range(num_iters//1000):
+        # (params, opt_state), loss_value = _step((params, opt_state))
+        (params,_), (_, loss_values) = lax.scan(_step, (params, opt_state), None, length=1000) #arange bc the inputs aren't changing
+        losses.append(loss_values)
+        # if n % 100 == 0:
+        print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
+        ys, _, _ = lin_sym_nm_rnn(params, x0, z0, sample_inputs, tau_x, tau_z)
+
+        fig.clf()
+        plt.xlabel('Timestep')
+        plt.plot(sample_targets, label='True target')
+        plt.plot(ys, label='RNN target')
+        plt.legend()
+        plt.pause(0.1)
 
     return params, losses
