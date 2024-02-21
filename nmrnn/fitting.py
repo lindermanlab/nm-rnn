@@ -221,7 +221,7 @@ def fit_mwg_lr_only(inputs, targets, loss_masks, nm_params, lr_params, optimizer
     return params, losses
 
 # training function for simplified case
-def fit_lin_sym_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_iters, tau_x, tau_z): # training on full set of data
+def fit_lin_sym_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_iters, tau_x, tau_z, wandb_log=False): # training on full set of data
     opt_state = optimizer.init(params)
     N_data = inputs.shape[0]
 
@@ -243,6 +243,7 @@ def fit_lin_sym_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, n
         # (params, opt_state), loss_value = _step((params, opt_state))
         (params,_), (_, loss_values) = lax.scan(_step, (params, opt_state), None, length=1000) #arange bc the inputs aren't changing
         losses.append(loss_values)
+        if wandb_log: wandb.log({'loss':loss_values[-1]})
         # if n % 100 == 0:
         print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
         ys, _, _ = lin_sym_nm_rnn(params, x0, z0, sample_inputs, tau_x, tau_z)

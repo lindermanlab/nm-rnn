@@ -72,7 +72,7 @@ init_params = random_nmrnn_params(key, config['U'], config['N'], config['R'],
 # train on all params
 params, losses = fit_lin_sym_nm_rnn(all_inputs, all_outputs, all_masks,
                                 init_params, optimizer, x0, z0, config['num_full_train_iters'],
-                                config['tau_x'], config['tau_z'])
+                                config['tau_x'], config['tau_z'], wandb_log=True)
 
 # log model
 log_wandb_model(params, "nmrnn_r{}_n{}_m{}".format(config['R'],config['N'],config['M']), 'model')
