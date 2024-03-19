@@ -1,3 +1,7 @@
+# for Sherlock, make sure to use local copy of nmrnn
+import sys
+sys.path.insert(1, '/home/groups/swl1/nm-rnn')
+
 import jax
 import jax.numpy as jnp
 import jax.random as jr
