@@ -1,6 +1,6 @@
 # for Sherlock, make sure to use local copy of nmrnn
-import sys
-sys.path.insert(1, '/home/groups/swl1/nm-rnn')
+# import sys
+# sys.path.insert(1, '/home/groups/swl1/nm-rnn')
 
 import jax
 import jax.numpy as jnp
@@ -22,7 +22,7 @@ default_config = dict(
     # model parameters
     N = 100,    # hidden state dim
     R = 3,      # rank of RNN
-    U = 3,      # input dim (3+num_tasks)
+    U = 5,      # input dim (3+num_tasks)
     O = 3,      # output dimension
     M = 5,      # NM dimension
     # got rid of K for now, set to R by default
@@ -33,7 +33,7 @@ default_config = dict(
     # Timing (task) parameters
     dt = 10,#ms
     # Data Generation
-    task_list = [sample_delay_pro, sample_delay_anti],
+    task_list = ['delay_pro', 'delay_anti'],
     T = 100,
     num_trials = 200,
     # Training
@@ -46,10 +46,21 @@ projectname = "nm-rnn-multitask"
 wandb.init(config=default_config, project=projectname, entity='nm-rnn')
 config = wandb.config
 
+# unpack tasks
+task_list = []
+if 'delay_pro' in config['task_list']:
+    task_list.append(sample_delay_pro)
+if 'delay_anti' in config['task_list']:
+    task_list.append(sample_delay_anti)
+if 'memory_pro' in config['task_list']:
+    task_list.append(sample_memory_pro)
+if 'memory_anti' in config['task_list']:
+    task_list.append(sample_memory_anti)
+
 # data generation
 task_order, samples_in, samples_out = random_trials(
-    config['keyind'], 
-    config['task_list'], 
+    jr.PRNGKey(config['keyind']), 
+    task_list, 
     config['T'], 
     config['num_trials'])
 
@@ -62,10 +73,6 @@ optimizer = optax.chain(
   optax.adamw(learning_rate=1e-3),
 )
 
-# make sure input dimension is right
-try: config['U'] == len(config['task_list']) + 3
-except: config['U'] = len(config['task_list']) + 3
-
 x0 = jnp.ones((config['N'],))*0.1
 z0 = jnp.ones((config['M'],))*0.1
 masks = jnp.ones_like(samples_out)
@@ -77,7 +84,7 @@ init_params = random_nmrnn_params(key, config['U'], config['N'], config['R'],
 # train on all params
 params, losses = fit_mwg_nm_rnn(samples_in.transpose((0,2,1)), samples_out.transpose((0,2,1)), masks.transpose((0,2,1)),
                                 init_params, optimizer, x0, z0, config['num_full_train_iters'],
-                                config['tau_x'], config['tau_z'], wandb_log=True, final_wandb_plot=True)
+                                config['tau_x'], config['tau_z'], plots=False, wandb_log=True, final_wandb_plot=True)
 
 # log model
 log_wandb_model(params, "multitask_nmrnn_r{}_n{}_m{}".format(config['R'],config['N'],config['M']), 'model')
