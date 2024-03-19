@@ -134,3 +134,226 @@ def sample_all(T,
     all_inputs, all_outputs, all_masks, = jax.vmap(_single)(batch_contexts, batch_intervals, batch_t_measures)
 
     return all_inputs, all_outputs[:,:,None], all_masks[:,:,None]
+
+
+### DUNCKER/DRISCOLL 2020 TASKS
+
+
+def sample_delay_pro(key,
+                     T):
+    # generate theta
+    key_stim, key_trialsplit,  = jr.split(key, 2)
+    theta_in = jr.uniform(key_stim, minval=0., maxval=2*jnp.pi)
+    theta_out = theta_in # values are the for this task
+
+    # segment trial into different periods
+    key_stim_on, key_fix_off, key_response = jr.split(key_trialsplit,3)
+    t_stim_on = jax.random.uniform(key_stim_on, minval=0.3, maxval=0.7) # time between 0 and when the stimulus comes on
+    t_fix_off = t_stim_on + jax.random.uniform(key_fix_off, minval=0.2, maxval=1.5) # time between when the stimulus comes on and when the go cue arrives (fix-off)
+    t_response = t_fix_off + jax.random.uniform(key_response, minval=0.3, maxval=0.7) # time between go cue and end of trial
+
+    t_total = t_response # total sampled time of trial
+
+    t_stim_on = t_stim_on/t_total * T
+    t_fix_off = t_fix_off/t_total * T
+
+    t = jnp.arange(T)
+    # make fixation input
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list = [1., 0.]
+    fix_input = cond_list[0]*func_list[0] + cond_list[1]*func_list[1]
+
+    # make stim inputs
+    stim_scale = 1.
+    cond_list = [t<t_stim_on, t>=t_stim_on]
+    func_list_1 = [0, stim_scale * jnp.sin(theta_in)]
+    func_list_2 = [0, stim_scale * jnp.cos(theta_in)]
+    stim_input_1 = cond_list[0]*func_list_1[0] + cond_list[1]*func_list_1[1]
+    stim_input_2 = cond_list[0]*func_list_2[0] + cond_list[1]*func_list_2[1]
+    stim_input = jnp.array([stim_input_1, stim_input_2])
+
+    # make fixation output
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list = [0.8, 0]
+    fix_output = cond_list[0]*func_list[0] + cond_list[1]*func_list[1]
+
+    # make response outputs
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list_1 = [0, jnp.sin(theta_out)]
+    func_list_2 = [0, jnp.cos(theta_out)]
+    response_output_1 = cond_list[0]*func_list_1[0] + cond_list[1]*func_list_1[1]
+    response_output_2 = cond_list[0]*func_list_2[0] + cond_list[1]*func_list_2[1]
+    response_output = jnp.array([response_output_1, response_output_2])
+
+    return jnp.vstack((fix_input, stim_input)), jnp.vstack((fix_output, response_output))
+
+
+def sample_delay_anti(key,
+                     T):
+    # generate theta
+    key_stim, key_trialsplit,  = jr.split(key, 2)
+    theta_in = jr.uniform(key_stim, minval=0., maxval=2*jnp.pi)
+    theta_out = theta_in + jnp.pi # opposite direction
+
+    # segment trial into different periods
+    key_stim_on, key_fix_off, key_response = jr.split(key_trialsplit,3)
+    t_stim_on = jax.random.uniform(key_stim_on, minval=0.3, maxval=0.7) # time between 0 and when the stimulus comes on
+    t_fix_off = t_stim_on + jax.random.uniform(key_fix_off, minval=0.2, maxval=1.5) # time between when the stimulus comes on and when the go cue arrives (fix-off)
+    t_response = t_fix_off + jax.random.uniform(key_response, minval=0.3, maxval=0.7) # time between go cue and end of trial
+
+    t_total = t_response # total sampled time of trial
+
+    t_stim_on = t_stim_on/t_total * T
+    t_fix_off = t_fix_off/t_total * T
+
+    t = jnp.arange(T)
+    # make fixation input
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list = [1., 0.]
+    fix_input = cond_list[0]*func_list[0] + cond_list[1]*func_list[1]
+
+    # make stim inputs
+    stim_scale = 1.
+    cond_list = [t<t_stim_on, t>=t_stim_on]
+    func_list_1 = [0, stim_scale * jnp.sin(theta_in)]
+    func_list_2 = [0, stim_scale * jnp.cos(theta_in)]
+    stim_input_1 = cond_list[0]*func_list_1[0] + cond_list[1]*func_list_1[1]
+    stim_input_2 = cond_list[0]*func_list_2[0] + cond_list[1]*func_list_2[1]
+    stim_input = jnp.array([stim_input_1, stim_input_2])
+
+    # make fixation output
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list = [0.8, 0]
+    fix_output = cond_list[0]*func_list[0] + cond_list[1]*func_list[1]
+
+    # make response outputs
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list_1 = [0, jnp.sin(theta_out)]
+    func_list_2 = [0, jnp.cos(theta_out)]
+    response_output_1 = cond_list[0]*func_list_1[0] + cond_list[1]*func_list_1[1]
+    response_output_2 = cond_list[0]*func_list_2[0] + cond_list[1]*func_list_2[1]
+    response_output = jnp.array([response_output_1, response_output_2])
+
+    return jnp.vstack((fix_input, stim_input)), jnp.vstack((fix_output, response_output))
+
+
+def sample_memory_pro(key,
+                     T):
+    # generate theta
+    key_stim, key_trialsplit,  = jr.split(key, 2)
+    theta_in = jr.uniform(key_stim, minval=0., maxval=2*jnp.pi)
+    theta_out = theta_in # values are the for this task
+
+    # segment trial into different periods
+    key_stim_on, key_stim_off, key_fix_off, key_response = jr.split(key_trialsplit,4)
+    t_stim_on = jax.random.uniform(key_stim_on, minval=0.3, maxval=0.7) # time between 0 and when the stimulus comes on
+    t_stim_off = t_stim_on + jax.random.uniform(key_stim_off, minval=0.2, maxval=1.6) # time between when the stimulus comes on and goes off
+    t_fix_off = t_stim_off + jax.random.uniform(key_fix_off, minval=0.2, maxval=1.6) # time between when the stimulus comes on and when the go cue arrives (fix-off)
+    t_response = t_fix_off + jax.random.uniform(key_response, minval=0.3, maxval=0.7) # time between go cue and end of trial
+
+    t_total = t_response # total sampled time of trial
+
+    t_stim_on = t_stim_on/t_total * T
+    t_stim_off = t_stim_off/t_total * T
+    t_fix_off = t_fix_off/t_total * T
+
+    t = jnp.arange(T)
+    # make fixation input
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list = [1., 0.]
+    fix_input = cond_list[0]*func_list[0] + cond_list[1]*func_list[1]
+
+    # make stim inputs
+    stim_scale = 1.
+    cond_list = [t<t_stim_on, jnp.logical_and(t>=t_stim_on, t<t_stim_off), t >=t_stim_off]
+    func_list_1 = [0, stim_scale * jnp.sin(theta_in), 0]
+    func_list_2 = [0, stim_scale * jnp.cos(theta_in), 0]
+    stim_input_1 = cond_list[0]*func_list_1[0] + cond_list[1]*func_list_1[1] + cond_list[2]*func_list_1[2]
+    stim_input_2 = cond_list[0]*func_list_2[0] + cond_list[1]*func_list_2[1] + cond_list[2]*func_list_2[2]
+    stim_input = jnp.array([stim_input_1, stim_input_2])
+
+    # make fixation output
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list = [0.8, 0]
+    fix_output = cond_list[0]*func_list[0] + cond_list[1]*func_list[1]
+
+    # make response outputs
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list_1 = [0, jnp.sin(theta_out)]
+    func_list_2 = [0, jnp.cos(theta_out)]
+    response_output_1 = cond_list[0]*func_list_1[0] + cond_list[1]*func_list_1[1]
+    response_output_2 = cond_list[0]*func_list_2[0] + cond_list[1]*func_list_2[1]
+    response_output = jnp.array([response_output_1, response_output_2])
+
+    return jnp.vstack((fix_input, stim_input)), jnp.vstack((fix_output, response_output))
+
+
+def sample_memory_anti(key,
+                     T):
+    # generate theta
+    key_stim, key_trialsplit,  = jr.split(key, 2)
+    theta_in = jr.uniform(key_stim, minval=0., maxval=2*jnp.pi)
+    theta_out = theta_in +  jnp.pi # opposite
+
+    # segment trial into different periods
+    key_stim_on, key_stim_off, key_fix_off, key_response = jr.split(key_trialsplit,4)
+    t_stim_on = jax.random.uniform(key_stim_on, minval=0.3, maxval=0.7) # time between 0 and when the stimulus comes on
+    t_stim_off = t_stim_on + jax.random.uniform(key_stim_off, minval=0.2, maxval=1.6) # time between when the stimulus comes on and goes off
+    t_fix_off = t_stim_off + jax.random.uniform(key_fix_off, minval=0.2, maxval=1.6) # time between when the stimulus comes on and when the go cue arrives (fix-off)
+    t_response = t_fix_off + jax.random.uniform(key_response, minval=0.3, maxval=0.7) # time between go cue and end of trial
+
+    t_total = t_response # total sampled time of trial
+
+    t_stim_on = t_stim_on/t_total * T
+    t_stim_off = t_stim_off/t_total * T
+    t_fix_off = t_fix_off/t_total * T
+
+    t = jnp.arange(T)
+    # make fixation input
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list = [1., 0.]
+    fix_input = cond_list[0]*func_list[0] + cond_list[1]*func_list[1]
+
+    # make stim inputs
+    stim_scale = 1.
+    cond_list = [t<t_stim_on, jnp.logical_and(t>=t_stim_on, t<t_stim_off), t >=t_stim_off]
+    func_list_1 = [0, stim_scale * jnp.sin(theta_in), 0]
+    func_list_2 = [0, stim_scale * jnp.cos(theta_in), 0]
+    stim_input_1 = cond_list[0]*func_list_1[0] + cond_list[1]*func_list_1[1] + cond_list[2]*func_list_1[2]
+    stim_input_2 = cond_list[0]*func_list_2[0] + cond_list[1]*func_list_2[1] + cond_list[2]*func_list_2[2]
+    stim_input = jnp.array([stim_input_1, stim_input_2])
+
+    # make fixation output
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list = [0.8, 0]
+    fix_output = cond_list[0]*func_list[0] + cond_list[1]*func_list[1]
+
+    # make response outputs
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list_1 = [0, jnp.sin(theta_out)]
+    func_list_2 = [0, jnp.cos(theta_out)]
+    response_output_1 = cond_list[0]*func_list_1[0] + cond_list[1]*func_list_1[1]
+    response_output_2 = cond_list[0]*func_list_2[0] + cond_list[1]*func_list_2[1]
+    response_output = jnp.array([response_output_1, response_output_2])
+
+    return jnp.vstack((fix_input, stim_input)), jnp.vstack((fix_output, response_output))
+
+def random_trials(key, task_list, T, num_trials):
+    key1, key2 = jr.split(key, 2)
+    num_tasks = len(task_list)
+    random_order = jr.choice(key1, num_tasks, shape=(num_trials,))
+   
+    sample_keys_trials = jr.split(key2, num_trials)
+
+    samples_in = jnp.zeros((num_trials, 3 + num_tasks, T))
+    samples_out = jnp.zeros((num_trials, 3, T))
+    for i in range(num_trials):
+        sample_in, sample_out = task_list[random_order[i]](sample_keys_trials[i], T)
+        samples_in = samples_in.at[i, :3, :].set(sample_in)
+        samples_out = samples_out.at[i].set(sample_out)
+        
+        # add context cue-ing
+        context = random_order[i]
+        samples_in = samples_in.at[i, 3+context, :].set(jnp.ones((T,)))
+
+    return random_order, samples_in, samples_out
