@@ -17,7 +17,9 @@ def nm_rnn(params, x0, z0, inputs, tau_x, tau_z, nln=jnp.tanh):
     """
 
     U = params["row_factors"]       # D x R
+    U, _ = jnp.linalg.qr(U)         # orthogonalize
     V = params["column_factors"]    # D x R
+    V, _ = jnp.linalg.qr(V)         # orthogonalize
     B_xu = params["input_weights"]     # D x M
     C = params["readout_weights"]   # O x D
     W_zz = params["nm_rec_weight"]         # dim_nm x dim_nm
@@ -39,7 +41,8 @@ def nm_rnn(params, x0, z0, inputs, tau_x, tau_z, nln=jnp.tanh):
         s = jax.nn.sigmoid(m @ z + c) # calculate nm signal
         x = (1.0 - (1. / tau_x)) * xp # decay term
         h = V.T @ nln(xp)
-        x += (1. / (tau_x * N)) * (U * s) @ h  # divide by N
+        #x += (1. / (tau_x * N)) * (U * s) @ h  # divide by N
+        x += (1. / (tau_x)) * (U * s) @ h # don't divide by N now because we normalized U
         x += (1. / tau_x) * B_xu @ u
 
         # calculate y
