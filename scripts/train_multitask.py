@@ -21,8 +21,8 @@ from nmrnn.rnn_code import batched_nm_rnn
 default_config = dict(
     # model parameters
     N = 100,    # hidden state dim
-    R = 3,      # rank of RNN
-    U = 5,      # input dim (3+num_tasks)
+    R = 4,      # rank of RNN
+    U = 7,      # input dim (3+num_tasks)
     O = 3,      # output dimension
     M = 5,      # NM dimension
     # got rid of K for now, set to R by default
@@ -33,11 +33,11 @@ default_config = dict(
     # Timing (task) parameters
     dt = 10,#ms
     # Data Generation
-    task_list = ['delay_pro', 'delay_anti'],
+    task_list = ['delay_pro', 'delay_anti', 'memory_pro', 'memory_anti'],
     T = 100,
-    num_trials = 200,
+    num_trials = 500,
     # Training
-    num_full_train_iters = 50_000,
+    num_full_train_iters = 100_000,
     keyind = 13,
 )
 
