@@ -12,7 +12,7 @@ import optax
 import matplotlib.pyplot as plt
 import wandb
 
-from nmrnn.data_generation import sample_memory_pro, sample_memory_anti, sample_delay_pro, sample_delay_anti, random_trials
+from nmrnn.data_generation import sample_memory_pro, sample_memory_anti, sample_delay_pro, sample_delay_anti, random_trials, one_of_each
 from nmrnn.util import random_nmrnn_params, log_wandb_model
 from nmrnn.fitting import fit_mwg_nm_rnn
 from nmrnn.rnn_code import batched_nm_rnn
@@ -89,3 +89,29 @@ params, losses = fit_mwg_nm_rnn(samples_in.transpose((0,2,1)), samples_out.trans
 # log model
 log_wandb_model(params, "multitask_nmrnn_r{}_n{}_m{}".format(config['R'],config['N'],config['M']), 'model')
 
+# another plot
+rank = config['R']
+key = jr.PRNGKey(13)
+T = 100
+task_list, samples_in, samples_out = one_of_each(key, T)
+task_labels = ['delay_pro', 'delay_anti', 'memory_pro', 'memory_anti']
+
+x0 = jnp.ones((100,))*0.1
+z0 = jnp.ones((5,))*0.1
+
+ys, xs, zs = batched_nm_rnn(params, x0, z0, samples_in.transpose((0,2,1)), 10, 100)
+
+m = params['nm_sigmoid_weight']
+b = params['nm_sigmoid_intercept']
+
+fig, axes = plt.subplots(rank, 1, figsize=[10,rank*2])
+
+for r, ax in enumerate(axes):
+    for i in range(4):
+        ax.plot(jax.nn.sigmoid((zs @ m.T + b)[i, :, r]), label=task_labels[i])
+        ax.legend(loc='lower left')
+        ax.set_ylabel('NM response')
+        ax.set_ylim(-0.1,1.1)
+ax.set_xlabel('time')
+
+wandb.log({'one_of_each':wandb.Image(fig)}, commit=True)

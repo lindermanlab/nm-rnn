@@ -357,3 +357,24 @@ def random_trials(key, task_list, T, num_trials):
         samples_in = samples_in.at[i, 3+context, :].set(jnp.ones((T,)))
 
     return random_order, samples_in, samples_out
+
+def one_of_each(key, T):
+    task_list = [sample_delay_pro, sample_delay_anti, sample_memory_pro, sample_memory_anti]
+    order = jnp.arange(4)
+    num_trials = 4
+    num_tasks = num_trials
+   
+    sample_keys_trials = jr.split(key, num_trials)
+
+    samples_in = jnp.zeros((num_trials, 3 + num_tasks, T))
+    samples_out = jnp.zeros((num_trials, 3, T))
+    for i in range(num_trials):
+        sample_in, sample_out = task_list[order[i]](sample_keys_trials[i], T)
+        samples_in = samples_in.at[i, :3, :].set(sample_in)
+        samples_out = samples_out.at[i].set(sample_out)
+        
+        # add context cue-ing
+        context = order[i]
+        samples_in = samples_in.at[i, 3+context, :].set(jnp.ones((T,)))
+
+    return task_list, samples_in, samples_out
