@@ -1,3 +1,5 @@
+# this script trains nm-rnn where the nm network is the only one to receive context
+
 # for Sherlock, make sure to use local copy of nmrnn
 # import sys
 # sys.path.insert(1, '/home/groups/swl1/nm-rnn')
@@ -14,8 +16,8 @@ import wandb
 
 from nmrnn.data_generation import sample_memory_pro, sample_memory_anti, sample_delay_pro, sample_delay_anti, random_trials, one_of_each
 from nmrnn.util import random_nmrnn_params, log_wandb_model
-from nmrnn.fitting import fit_mwg_nm_rnn
-from nmrnn.rnn_code import batched_nm_rnn
+from nmrnn.fitting import fit_mwg_context_nm_rnn
+from nmrnn.rnn_code import batched_context_nm_rnn
 
 # parameters we want to track in wandb
 default_config = dict(
@@ -39,7 +41,7 @@ default_config = dict(
     # Training
     num_full_train_iters = 100_000,
     keyind = 13,
-    orth_u = False
+    orth_u = True
 )
 
 # wandb stuff
@@ -65,6 +67,9 @@ task_order, samples_in, samples_out = random_trials(
     config['T'], 
     config['num_trials'])
 
+task_samples_in = samples_in[:,:config['U']-len(task_list), :]
+context_samples_in = samples_in[:,config['U']-len(task_list):, :]
+
 key = jr.PRNGKey(config['keyind'])
 
 # define a simple optimizer
@@ -81,15 +86,17 @@ masks = jnp.ones_like(samples_out)
 # generate random initial parameters
 init_params = random_nmrnn_params(key, config['U'], config['N'], config['R'],
                                   config['M'], config['R'], config['O'])
+# crop input weights since LR component won't get context
+init_params['input_weights'] = init_params['input_weights'][:,:config['U']-len(task_list)]
 
 # train on all params
-params, losses = fit_mwg_nm_rnn(samples_in.transpose((0,2,1)), samples_out.transpose((0,2,1)), masks.transpose((0,2,1)),
+params, losses = fit_mwg_context_nm_rnn(task_samples_in.transpose((0,2,1)), context_samples_in.transpose((0,2,1)), samples_out.transpose((0,2,1)), masks.transpose((0,2,1)),
                                 init_params, optimizer, x0, z0, config['num_full_train_iters'],
                                 config['tau_x'], config['tau_z'], 
                                 plots=False, wandb_log=True, final_wandb_plot=True, orth_u=config['orth_u'])
 
 # log model
-log_wandb_model(params, "multitask_nmrnn_r{}_n{}_m{}".format(config['R'],config['N'],config['M']), 'model')
+log_wandb_model(params, "multitask_context_nmrnn_r{}_n{}_m{}".format(config['R'],config['N'],config['M']), 'model')
 
 # another plot
 rank = config['R']
@@ -101,7 +108,7 @@ task_labels = ['delay_pro', 'delay_anti', 'memory_pro', 'memory_anti']
 x0 = jnp.ones((100,))*0.1
 z0 = jnp.ones((5,))*0.1
 
-ys, xs, zs = batched_nm_rnn(params, x0, z0, samples_in.transpose((0,2,1)), 10, 100, config['orth_u'])
+ys, xs, zs = batched_context_nm_rnn(params, x0, z0, samples_in.transpose((0,2,1)), 10, 100, config['orth_u'])
 
 m = params['nm_sigmoid_weight']
 b = params['nm_sigmoid_intercept']

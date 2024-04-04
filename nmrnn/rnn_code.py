@@ -7,7 +7,7 @@ import optax
 import matplotlib.pyplot as plt
 
 # CODE FOR NM-RNN
-def nm_rnn(params, x0, z0, inputs, tau_x, tau_z, nln=jnp.tanh, orth_u=True):
+def nm_rnn(params, x0, z0, inputs, tau_x, tau_z, orth_u, nln=jnp.tanh):
     """
     Arguments:
     - params
@@ -53,10 +53,10 @@ def nm_rnn(params, x0, z0, inputs, tau_x, tau_z, nln=jnp.tanh, orth_u=True):
 
     return ys, xs, zs
 
-batched_nm_rnn = vmap(nm_rnn, in_axes=(None, None, None, 0, None, None))
+batched_nm_rnn = vmap(nm_rnn, in_axes=(None, None, None, 0, None, None, None))
 
 def batched_nm_rnn_loss(params, x0, z0, batch_inputs, tau_x, tau_z, batch_targets, batch_mask, orth_u=True):
-    ys, _, _ = batched_nm_rnn(params, x0, z0, batch_inputs, tau_x, tau_z, orth_u=orth_u)
+    ys, _, _ = batched_nm_rnn(params, x0, z0, batch_inputs, tau_x, tau_z, orth_u)
     return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)
 
 # don't compute loss over LR params
@@ -150,7 +150,7 @@ def batched_lin_sym_nm_rnn_loss(params, x0, z0, batch_inputs, tau_x, tau_z, batc
     return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)
 
 # CODE FOR MULTITASK NM-RNN WHERE ONLY NM RECEIVES CONTEXT
-def context_nm_rnn(params, x0, z0, task_inputs, context_inputs, tau_x, tau_z, nln=jnp.tanh):
+def context_nm_rnn(params, x0, z0, task_inputs, context_inputs, tau_x, tau_z, orth_u, nln=jnp.tanh):
     """
     Arguments:
     - params
@@ -161,7 +161,7 @@ def context_nm_rnn(params, x0, z0, task_inputs, context_inputs, tau_x, tau_z, nl
     """
 
     U = params["row_factors"]       # D x R
-    U, _ = jnp.linalg.qr(U)         # orthogonalize
+    if orth_u: U, _ = jnp.linalg.qr(U)         # orthogonalize
     V = params["column_factors"]    # D x R
     # V, _ = jnp.linalg.qr(V)         # orthogonalize
     B_xu = params["input_weights"]     # D x M
@@ -177,8 +177,9 @@ def context_nm_rnn(params, x0, z0, task_inputs, context_inputs, tau_x, tau_z, nl
     #TODO: check concat
     inputs_z = jnp.concatenate((task_inputs, context_inputs), axis=-1) # T x (M + dim_context)
 
-    def _step(x_and_z, u_x, u_z):
+    def _step(x_and_z, u):
         x, z = x_and_z
+        u_x, u_z = u
 
         # update z
         z = (1.0 - (1. / tau_z)) * z + (1. / tau_z) * W_zz @ nln(z)
@@ -197,12 +198,12 @@ def context_nm_rnn(params, x0, z0, task_inputs, context_inputs, tau_x, tau_z, nl
         y = C @ x
         return (x, z), (y, x, z)
 
-    _, (ys, xs, zs) = lax.scan(_step, (x0, z0), inputs_x, inputs_z)
+    _, (ys, xs, zs) = lax.scan(_step, (x0, z0), (inputs_x, inputs_z))
 
     return ys, xs, zs
 
-batched_context_nm_rnn = vmap(context_nm_rnn, in_axes=(None, None, None, 0, 0, None, None))
+batched_context_nm_rnn = vmap(context_nm_rnn, in_axes=(None, None, None, 0, 0, None, None, None))
 
-def batched_context_nm_rnn_loss(params, x0, z0, batch_task_inputs, batch_context_inputs, tau_x, tau_z, batch_targets, batch_mask):
-    ys, _, _ = batched_context_nm_rnn(params, x0, z0, batch_task_inputs, batch_context_inputs, tau_x, tau_z)
+def batched_context_nm_rnn_loss(params, x0, z0, batch_task_inputs, batch_context_inputs, tau_x, tau_z, batch_targets, batch_mask, orth_u=True):
+    ys, _, _ = batched_context_nm_rnn(params, x0, z0, batch_task_inputs, batch_context_inputs, tau_x, tau_z, orth_u)
     return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)

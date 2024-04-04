@@ -14,7 +14,7 @@ import wandb
 
 from nmrnn.data_generation import sample_memory_pro, sample_memory_anti, sample_delay_pro, sample_delay_anti, random_trials, one_of_each
 from nmrnn.util import random_nmrnn_params, log_wandb_model
-from nmrnn.fitting import fit_mwg_nm_rnn
+from nmrnn.fitting import fit_mwg_nm_rnn, fit_mwg_nm_only
 from nmrnn.rnn_code import batched_nm_rnn
 
 # parameters we want to track in wandb
@@ -38,8 +38,9 @@ default_config = dict(
     num_trials = 500,
     # Training
     num_full_train_iters = 100_000,
+    num_nm_only_iters = 10_000,
     keyind = 13,
-    orth_u = False
+    orth_u = True
 )
 
 # wandb stuff
@@ -82,9 +83,22 @@ masks = jnp.ones_like(samples_out)
 init_params = random_nmrnn_params(key, config['U'], config['N'], config['R'],
                                   config['M'], config['R'], config['O'])
 
+
+# split parameters for now
+nm_params = {k: init_params[k] for k in ('nm_rec_weight', 'nm_input_weight', 'nm_sigmoid_weight', 'nm_sigmoid_intercept')}
+lr_params = {k: init_params[k] for k in ('row_factors', 'column_factors', 'input_weights', 'readout_weights')}
+
+if config['num_nm_only_iters'] != 0:
+# # train on nm params only for a bit
+    params, nm_only_losses = fit_mwg_nm_only(samples_in.transpose((0,2,1)), samples_out.transpose((0,2,1)), masks.transpose((0,2,1)), nm_params,
+                                    lr_params, optimizer, x0, z0, config['num_nm_only_iters'],
+                                            config['tau_x'], config['tau_z'], 
+                                            plots=False, wandb_log=True, final_wandb_plot=False, orth_u=config['orth_u'])
+else: params = init_params
+
 # train on all params
 params, losses = fit_mwg_nm_rnn(samples_in.transpose((0,2,1)), samples_out.transpose((0,2,1)), masks.transpose((0,2,1)),
-                                init_params, optimizer, x0, z0, config['num_full_train_iters'],
+                                params, optimizer, x0, z0, config['num_full_train_iters'],
                                 config['tau_x'], config['tau_z'], 
                                 plots=False, wandb_log=True, final_wandb_plot=True, orth_u=config['orth_u'])
 
