@@ -13,14 +13,14 @@ from nmrnn.data_generation import sample_one
 from nmrnn.rnn_code import batched_nm_rnn_loss, nm_rnn, batched_lr_rnn_loss, lr_rnn, batched_nm_rnn_loss_frozen, lin_sym_nm_rnn, batched_lin_sym_nm_rnn_loss
 
 def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_iters, tau_x, tau_z,
-                   plots=True, wandb_log=False, final_wandb_plot=False): # training on full set of data
+                   plots=True, wandb_log=False, final_wandb_plot=False, orth_u=True): # training on full set of data
     opt_state = optimizer.init(params)
     N_data = inputs.shape[0]
 
     @jit
     def _step(params_and_opt, input):
         (params, opt_state) = params_and_opt
-        loss_value, grads = jax.value_and_grad(batched_nm_rnn_loss)(params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks)
+        loss_value, grads = jax.value_and_grad(batched_nm_rnn_loss)(params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks, orth_u=orth_u)
         updates, opt_state = optimizer.update(grads, opt_state, params)
         params = optax.apply_updates(params, updates)
         return (params, opt_state), (params, loss_value)
@@ -36,7 +36,7 @@ def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_i
         print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
         if wandb_log: wandb.log({'loss':loss_values[-1]})
 
-        ys, _, zs = nm_rnn(params, x0, z0, sample_inputs, tau_x, tau_z)
+        ys, _, zs = nm_rnn(params, x0, z0, sample_inputs, tau_x, tau_z, orth_u=orth_u)
 
         if plots:
             # plt.figure(figsize=[10,6])
@@ -106,7 +106,7 @@ def fit_mwg_lr_rnn(inputs, targets, loss_masks, params, optimizer, x0, num_iters
 
 # training function to fit only neuromodulatory parameters
 def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimizer, x0, z0, num_iters, tau_x, tau_z,
-                    plots=True, wandb_log=False, final_wandb_plot=False): # training on full set of data
+                    plots=True, wandb_log=False, final_wandb_plot=False, orth_u=True): # training on full set of data
     opt_state = optimizer.init(nm_params)
     N_data = inputs.shape[0]
 
@@ -114,7 +114,7 @@ def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimi
     def _step(params_and_opt, input):
         (nm_params, opt_state) = params_and_opt
         #pdb.set_breakpoint()
-        loss_value, grads = jax.value_and_grad(batched_nm_rnn_loss_frozen)(nm_params, other_params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks)
+        loss_value, grads = jax.value_and_grad(batched_nm_rnn_loss_frozen)(nm_params, other_params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks, orth_u=orth_u)
         updates, opt_state = optimizer.update(grads, opt_state, nm_params)
         nm_params = optax.apply_updates(nm_params, updates)
         return (nm_params, opt_state), (nm_params, loss_value)
@@ -130,7 +130,7 @@ def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimi
         if wandb_log: wandb.log({'loss':loss_values[-1]})
 
         params = dict(nm_params, **other_params)
-        ys, _, zs = nm_rnn(params, x0, z0, sample_inputs, tau_x, tau_z)
+        ys, _, zs = nm_rnn(params, x0, z0, sample_inputs, tau_x, tau_z, orth_u=orth_u)
 
         if plots:
             # plt.figure(figsize=[10,6])

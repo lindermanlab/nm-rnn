@@ -55,10 +55,14 @@ def nm_rnn(params, x0, z0, inputs, tau_x, tau_z, nln=jnp.tanh, orth_u=True):
 
 batched_nm_rnn = vmap(nm_rnn, in_axes=(None, None, None, 0, None, None))
 
-def batched_nm_rnn_loss(params, x0, z0, batch_inputs, tau_x, tau_z, batch_targets, batch_mask):
-    ys, _, _ = batched_nm_rnn(params, x0, z0, batch_inputs, tau_x, tau_z)
+def batched_nm_rnn_loss(params, x0, z0, batch_inputs, tau_x, tau_z, batch_targets, batch_mask, orth_u=True):
+    ys, _, _ = batched_nm_rnn(params, x0, z0, batch_inputs, tau_x, tau_z, orth_u=orth_u)
     return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)
 
+# don't compute loss over LR params
+def batched_nm_rnn_loss_frozen(nm_params, other_params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks, orth_u=True):
+    params = dict(nm_params, **other_params)
+    return batched_nm_rnn_loss(params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks, orth_u=orth_u)
 
 # CODE FOR LOW-RANK RNN
 def lr_rnn(params, x0, inputs, tau, nln=jnp.tanh):
@@ -93,11 +97,6 @@ batched_lr_rnn = vmap(lr_rnn, in_axes=(None, None, 0, None))
 def batched_lr_rnn_loss(params, x0, batch_inputs, tau, batch_targets, batch_mask):
     ys, _ = batched_lr_rnn(params, x0, batch_inputs, tau)
     return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)
-
-def batched_nm_rnn_loss_frozen(nm_params, other_params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks):
-    params = dict(nm_params, **other_params)
-    return batched_nm_rnn_loss(params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks)
-
 
 # CODE FOR LINEAR SYMMETRIC NM-RNN
 def lin_sym_nm_rnn(params, x0, z0, inputs, tau_x, tau_z):
