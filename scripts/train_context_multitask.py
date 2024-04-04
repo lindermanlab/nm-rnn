@@ -108,7 +108,10 @@ task_labels = ['delay_pro', 'delay_anti', 'memory_pro', 'memory_anti']
 x0 = jnp.ones((100,))*0.1
 z0 = jnp.ones((5,))*0.1
 
-ys, xs, zs = batched_context_nm_rnn(params, x0, z0, samples_in.transpose((0,2,1)), 10, 100, config['orth_u'])
+task_samples_in = samples_in[:,:config['U']-len(task_list), :]
+context_samples_in = samples_in[:,config['U']-len(task_list):, :]
+
+ys, xs, zs = batched_context_nm_rnn(params, x0, z0, task_samples_in.transpose((0,2,1)), context_samples_in.transpose((0,2,1)), 10, 100, config['orth_u'])
 
 m = params['nm_sigmoid_weight']
 b = params['nm_sigmoid_intercept']
