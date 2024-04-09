@@ -24,8 +24,8 @@ default_config = dict(
     # model parameters
     N = 100,    # hidden state dim
     R = 4,      # rank of RNN
-    U = 6,      # input dim (3+num_tasks if fix_output, 2+num_tasks if not)
-    O = 3,      # output dimension
+    U = 7,      # input dim (3+num_tasks)
+    O = 2,      # output dimension
     M = 5,      # NM dimension
     # got rid of K for now, set to R by default
     #K = 2,      # NM sigmoid dimension (must be 1 or R)
