@@ -380,5 +380,121 @@ def one_of_each(key, T, fix_output=False):
         samples_in = samples_in.at[i, 3+context, :].set(jnp.ones((T,)))
 
     if not fix_output: samples_out = samples_out[:, 1:, :]
-    
+
     return task_list, samples_in, samples_out
+
+def sample_dm1(key, T):
+    # generate thetas
+    key_stim1, key_stim2, key_trialsplit, key_coherence  = jr.split(key, 4)
+    theta_in1 = jr.uniform(key_stim1, minval=0., maxval=2*jnp.pi)
+    theta_in2 = theta_in1 + jr.uniform(key_stim2, minval=jnp.pi/2, maxval=(3/2)*jnp.pi) # theta_2 sampled between 90 and 270 deg away from theta_1
+
+    # segment trial into different periods
+    key_stim1_on, key_stim1_off, key_stim2_off, key_response = jr.split(key_trialsplit,4)
+    t_stim1_on = jax.random.uniform(key_stim1_on, minval=0.3, maxval=0.7) # time between 0 and when the stimulus1 comes on
+    t_stim1_off = t_stim1_on + jax.random.uniform(key_stim1_off, minval=0.2, maxval=1.6) # time between when the stimulus1 comes on and goes off
+    t_stim2_off = t_stim1_off + jax.random.uniform(key_stim2_off, minval=0.2, maxval=1.6) # time between when the stimulus2 comes on and goes off
+    t_fix_off = t_stim2_off #+ jax.random.uniform(key_fix_off, minval=0.2, maxval=1.6) # time between when the stimulus comes on and when the go cue arrives (fix-off)
+    t_response = t_fix_off + jax.random.uniform(key_response, minval=0.3, maxval=0.7) # time between go cue and end of trial
+
+    t_total = t_response # total sampled time of trial
+
+    t_stim1_on = t_stim1_on/t_total * T
+    t_stim1_off = t_stim1_off/t_total * T
+    t_fix_off = t_fix_off/t_total * T
+
+    t = jnp.arange(T)
+    # make fixation input
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list = [1., 0.]
+    fix_input = cond_list[0]*func_list[0] + cond_list[1]*func_list[1]
+
+    # make stim inputs
+    coherence = jax.random.uniform(key_coherence, minval=0.1, maxval=0.8) * jax.random.choice(key_coherence, a=jnp.array([-1,1]))
+    stim_scale_1 = 1. + coherence
+    stim_scale_2 = 1. - coherence
+    cond_list = [t<t_stim1_on, jnp.logical_and(t>=t_stim1_on, t<t_stim1_off), jnp.logical_and(t>=t_stim1_off, t<t_fix_off), t >= t_fix_off]
+    func_list_1 = [0, stim_scale_1 * jnp.sin(theta_in1), stim_scale_2 * jnp.sin(theta_in2), 0]
+    func_list_2 = [0, stim_scale_1 * jnp.cos(theta_in1), stim_scale_2 * jnp.cos(theta_in2), 0]
+    stim_input_1 = cond_list[0]*func_list_1[0] + cond_list[1]*func_list_1[1] + cond_list[2]*func_list_1[2] + cond_list[3]*func_list_1[3]
+    stim_input_2 = cond_list[0]*func_list_2[0] + cond_list[1]*func_list_2[1] + cond_list[2]*func_list_2[2] + cond_list[3]*func_list_2[3]
+    stim_input = jnp.array([stim_input_1, stim_input_2])
+
+    # make fixation output
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list = [0.8, 0]
+    fix_output = cond_list[0]*func_list[0] + cond_list[1]*func_list[1]
+
+    # make response outputs
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    if coherence > 0: # first stim is stronger
+        func_list_1 = [0, jnp.sin(theta_in1)]
+        func_list_2 = [0, jnp.cos(theta_in1)]
+    if coherence < 0: # second stim is stronger
+        func_list_1 = [0, jnp.sin(theta_in2)]
+        func_list_2 = [0, jnp.cos(theta_in2)]
+    response_output_1 = cond_list[0]*func_list_1[0] + cond_list[1]*func_list_1[1]
+    response_output_2 = cond_list[0]*func_list_2[0] + cond_list[1]*func_list_2[1]
+    response_output = jnp.array([response_output_1, response_output_2])
+
+    ignore_input = jnp.zeros_like(stim_input) # second modality to be ignored
+
+    return jnp.vstack((fix_input, stim_input, ignore_input)), jnp.vstack((fix_output, response_output))
+
+def sample_dm2(key, T):
+    # generate thetas
+    key_stim1, key_stim2, key_trialsplit, key_coherence  = jr.split(key, 4)
+    theta_in1 = jr.uniform(key_stim1, minval=0., maxval=2*jnp.pi)
+    theta_in2 = theta_in1 + jr.uniform(key_stim2, minval=jnp.pi/2, maxval=(3/2)*jnp.pi) # theta_2 sampled between 90 and 270 deg away from theta_1
+
+    # segment trial into different periods
+    key_stim1_on, key_stim1_off, key_stim2_off, key_response = jr.split(key_trialsplit,4)
+    t_stim1_on = jax.random.uniform(key_stim1_on, minval=0.3, maxval=0.7) # time between 0 and when the stimulus1 comes on
+    t_stim1_off = t_stim1_on + jax.random.uniform(key_stim1_off, minval=0.2, maxval=1.6) # time between when the stimulus1 comes on and goes off
+    t_stim2_off = t_stim1_off + jax.random.uniform(key_stim2_off, minval=0.2, maxval=1.6) # time between when the stimulus2 comes on and goes off
+    t_fix_off = t_stim2_off #+ jax.random.uniform(key_fix_off, minval=0.2, maxval=1.6) # time between when the stimulus comes on and when the go cue arrives (fix-off)
+    t_response = t_fix_off + jax.random.uniform(key_response, minval=0.3, maxval=0.7) # time between go cue and end of trial
+
+    t_total = t_response # total sampled time of trial
+
+    t_stim1_on = t_stim1_on/t_total * T
+    t_stim1_off = t_stim1_off/t_total * T
+    t_fix_off = t_fix_off/t_total * T
+
+    t = jnp.arange(T)
+    # make fixation input
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list = [1., 0.]
+    fix_input = cond_list[0]*func_list[0] + cond_list[1]*func_list[1]
+
+    # make stim inputs
+    coherence = jax.random.uniform(key_coherence, minval=0.1, maxval=0.8) * jax.random.choice(key_coherence, a=jnp.array([-1,1]))
+    stim_scale_1 = 1. + coherence
+    stim_scale_2 = 1. - coherence
+    cond_list = [t<t_stim1_on, jnp.logical_and(t>=t_stim1_on, t<t_stim1_off), jnp.logical_and(t>=t_stim1_off, t<t_fix_off), t >= t_fix_off]
+    func_list_1 = [0, stim_scale_1 * jnp.sin(theta_in1), stim_scale_2 * jnp.sin(theta_in2), 0]
+    func_list_2 = [0, stim_scale_1 * jnp.cos(theta_in1), stim_scale_2 * jnp.cos(theta_in2), 0]
+    stim_input_1 = cond_list[0]*func_list_1[0] + cond_list[1]*func_list_1[1] + cond_list[2]*func_list_1[2] + cond_list[3]*func_list_1[3]
+    stim_input_2 = cond_list[0]*func_list_2[0] + cond_list[1]*func_list_2[1] + cond_list[2]*func_list_2[2] + cond_list[3]*func_list_2[3]
+    stim_input = jnp.array([stim_input_1, stim_input_2])
+
+    # make fixation output
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    func_list = [0.8, 0]
+    fix_output = cond_list[0]*func_list[0] + cond_list[1]*func_list[1]
+
+    # make response outputs
+    cond_list = [t < t_fix_off, t >=t_fix_off]
+    if coherence > 0: # first stim is stronger
+        func_list_1 = [0, jnp.sin(theta_in1)]
+        func_list_2 = [0, jnp.cos(theta_in1)]
+    if coherence < 0: # second stim is stronger
+        func_list_1 = [0, jnp.sin(theta_in2)]
+        func_list_2 = [0, jnp.cos(theta_in2)]
+    response_output_1 = cond_list[0]*func_list_1[0] + cond_list[1]*func_list_1[1]
+    response_output_2 = cond_list[0]*func_list_2[0] + cond_list[1]*func_list_2[1]
+    response_output = jnp.array([response_output_1, response_output_2])
+
+    ignore_input = jnp.zeros_like(stim_input) # first modality to be ignored
+
+    return jnp.vstack((fix_input, ignore_input, stim_input)), jnp.vstack((fix_output, response_output))
