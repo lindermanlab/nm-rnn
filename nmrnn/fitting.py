@@ -179,7 +179,7 @@ def fit_mwg_context_nm_rnn(task_inputs, context_inputs, targets, loss_masks, par
     losses = []
     # sample_inputs, sample_targets, sample_masks = sample_one(jr.PRNGKey(1), T, intervals, measure_min, measure_max, delay, mask_pad)
 
-    sample_task_inputs, sample_context_inputs, sample_targets, sample_masks = task_inputs[0], context_inputs[0], targets[0], loss_masks[0] # grab a single trial to plot output
+    #sample_task_inputs, sample_context_inputs, sample_targets, sample_masks = task_inputs[0], context_inputs[0], targets[0], loss_masks[0] # grab a single trial to plot output
 
     for n in range(num_iters//1000):
         (params,_), (_, loss_values) = lax.scan(_step, (params, opt_state), None, length=1000) #arange bc the inputs aren't changing
@@ -187,34 +187,34 @@ def fit_mwg_context_nm_rnn(task_inputs, context_inputs, targets, loss_masks, par
         print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
         if wandb_log: wandb.log({'loss':loss_values[-1]})
 
-        ys, _, zs = context_nm_rnn(params, x0, z0, sample_task_inputs, sample_context_inputs, tau_x, tau_z, orth_u=orth_u)
+    #     ys, _, zs = context_nm_rnn(params, x0, z0, sample_task_inputs, sample_context_inputs, tau_x, tau_z, orth_u=orth_u)
 
-        if plots:
-            # plt.figure(figsize=[10,6])
-            fig, (ax0, ax1) = plt.subplots(2, 1, figsize=[10,6])
-            # ax0.xlabel('Timestep')
-            ax0.plot(sample_targets, label='True target')
-            ax0.plot(ys, label='RNN target')
-            ax0.legend()
-            ax1.set_xlabel('Timestep')
-            m = params['nm_sigmoid_weight']
-            b = params['nm_sigmoid_intercept']
-            ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
-            # ax1.legend()
-            plt.pause(0.1)
+    #     if plots:
+    #         # plt.figure(figsize=[10,6])
+    #         fig, (ax0, ax1) = plt.subplots(2, 1, figsize=[10,6])
+    #         # ax0.xlabel('Timestep')
+    #         ax0.plot(sample_targets, label='True target')
+    #         ax0.plot(ys, label='RNN target')
+    #         ax0.legend()
+    #         ax1.set_xlabel('Timestep')
+    #         m = params['nm_sigmoid_weight']
+    #         b = params['nm_sigmoid_intercept']
+    #         ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
+    #         # ax1.legend()
+    #         plt.pause(0.1)
 
-    if final_wandb_plot:
-        fig, (ax0, ax1) = plt.subplots(2, 1, figsize=[10, 6])
-        # ax0.xlabel('Timestep')
-        ax0.plot(sample_targets, label='True target')
-        ax0.plot(ys, label='RNN target')
-        ax0.legend()
-        ax1.set_xlabel('Timestep')
-        m = params['nm_sigmoid_weight']
-        b = params['nm_sigmoid_intercept']
-        ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
-        # ax1.legend()
-        wandb.log({'final_curves':wandb.Image(fig)}, commit=True)
+    # if final_wandb_plot:
+    #     fig, (ax0, ax1) = plt.subplots(2, 1, figsize=[10, 6])
+    #     # ax0.xlabel('Timestep')
+    #     ax0.plot(sample_targets, label='True target')
+    #     ax0.plot(ys, label='RNN target')
+    #     ax0.legend()
+    #     ax1.set_xlabel('Timestep')
+    #     m = params['nm_sigmoid_weight']
+    #     b = params['nm_sigmoid_intercept']
+    #     ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
+    #     # ax1.legend()
+    #     wandb.log({'final_curves':wandb.Image(fig)}, commit=True)
 
     return params, losses
 

@@ -338,7 +338,7 @@ def sample_memory_anti(key,
 
     return jnp.vstack((fix_input, stim_input)), jnp.vstack((fix_output, response_output))
 
-def random_trials(key, task_list, T, num_trials):
+def random_trials(key, task_list, T, num_trials, fix_output=False):
     key1, key2 = jr.split(key, 2)
     num_tasks = len(task_list)
     random_order = jr.choice(key1, num_tasks, shape=(num_trials,))
@@ -356,9 +356,11 @@ def random_trials(key, task_list, T, num_trials):
         context = random_order[i]
         samples_in = samples_in.at[i, 3+context, :].set(jnp.ones((T,)))
 
+    if not fix_output: samples_out = samples_out[:, 1:, :]
+
     return random_order, samples_in, samples_out
 
-def one_of_each(key, T):
+def one_of_each(key, T, fix_output=False):
     task_list = [sample_delay_pro, sample_delay_anti, sample_memory_pro, sample_memory_anti]
     order = jnp.arange(4)
     num_trials = 4
@@ -377,4 +379,6 @@ def one_of_each(key, T):
         context = order[i]
         samples_in = samples_in.at[i, 3+context, :].set(jnp.ones((T,)))
 
+    if not fix_output: samples_out = samples_out[:, 1:, :]
+    
     return task_list, samples_in, samples_out

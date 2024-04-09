@@ -17,14 +17,14 @@ import wandb
 from nmrnn.data_generation import sample_memory_pro, sample_memory_anti, sample_delay_pro, sample_delay_anti, random_trials, one_of_each
 from nmrnn.util import random_nmrnn_params, log_wandb_model
 from nmrnn.fitting import fit_mwg_context_nm_rnn
-from nmrnn.rnn_code import batched_context_nm_rnn
+from nmrnn.rnn_code import batched_context_nm_rnn, context_nm_rnn
 
 # parameters we want to track in wandb
 default_config = dict(
     # model parameters
     N = 100,    # hidden state dim
     R = 4,      # rank of RNN
-    U = 7,      # input dim (3+num_tasks)
+    U = 6,      # input dim (3+num_tasks if fix_output, 2+num_tasks if not)
     O = 3,      # output dimension
     M = 5,      # NM dimension
     # got rid of K for now, set to R by default
@@ -41,7 +41,8 @@ default_config = dict(
     # Training
     num_full_train_iters = 100_000,
     keyind = 13,
-    orth_u = True
+    orth_u = True,
+    fix_output=False
 )
 
 # wandb stuff
@@ -65,8 +66,10 @@ task_order, samples_in, samples_out = random_trials(
     jr.PRNGKey(config['keyind']), 
     task_list, 
     config['T'], 
-    config['num_trials'])
+    config['num_trials'],
+    config['fix_output'])
 
+# separate out task and context inputs
 task_samples_in = samples_in[:,:config['U']-len(task_list), :]
 context_samples_in = samples_in[:,config['U']-len(task_list):, :]
 
@@ -98,6 +101,23 @@ params, losses = fit_mwg_context_nm_rnn(task_samples_in.transpose((0,2,1)), cont
 # log model
 log_wandb_model(params, "multitask_context_nmrnn_r{}_n{}_m{}".format(config['R'],config['N'],config['M']), 'model')
 
+# example outputs plot
+sample_task_inputs, sample_context_inputs, sample_targets, sample_masks = task_samples_in.transpose((0,2,1))[0], context_samples_in.transpose((0,2,1))[0], samples_out.transpose((0,2,1))[0], masks.transpose((0,2,1))[0] # grab a single trial to plot output
+
+ys, _, zs = context_nm_rnn(params, x0, z0, sample_task_inputs, sample_context_inputs, config['tau_x'], config['tau_z'], orth_u=config['orth_u'])
+
+fig, (ax0, ax1) = plt.subplots(2, 1, figsize=[10, 6])
+# ax0.xlabel('Timestep')
+ax0.plot(sample_targets, label='True target')
+ax0.plot(ys, label='RNN target')
+ax0.legend()
+ax1.set_xlabel('Timestep')
+m = params['nm_sigmoid_weight']
+b = params['nm_sigmoid_intercept']
+ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
+# ax1.legend()
+wandb.log({'final_curves':wandb.Image(fig)}, commit=True)
+
 # another plot
 rank = config['R']
 key = jr.PRNGKey(13)
@@ -112,9 +132,6 @@ task_samples_in = samples_in[:,:config['U']-len(task_list), :]
 context_samples_in = samples_in[:,config['U']-len(task_list):, :]
 
 ys, xs, zs = batched_context_nm_rnn(params, x0, z0, task_samples_in.transpose((0,2,1)), context_samples_in.transpose((0,2,1)), 10, 100, config['orth_u'])
-
-m = params['nm_sigmoid_weight']
-b = params['nm_sigmoid_intercept']
 
 fig, axes = plt.subplots(rank, 1, figsize=[10,rank*2])
 
