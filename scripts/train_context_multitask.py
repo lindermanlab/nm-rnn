@@ -14,7 +14,7 @@ import optax
 import matplotlib.pyplot as plt
 import wandb
 
-from nmrnn.data_generation import sample_memory_pro, sample_memory_anti, sample_delay_pro, sample_delay_anti, random_trials, one_of_each
+from nmrnn.data_generation import sample_memory_pro, sample_memory_anti, sample_delay_pro, sample_delay_anti, sample_dm1, sample_dm2, random_trials, one_of_each
 from nmrnn.util import random_nmrnn_params, log_wandb_model
 from nmrnn.fitting import fit_mwg_context_nm_rnn
 from nmrnn.rnn_code import batched_context_nm_rnn, context_nm_rnn
@@ -35,7 +35,12 @@ default_config = dict(
     # Timing (task) parameters
     dt = 10,#ms
     # Data Generation
-    task_list = ['delay_pro', 'delay_anti', 'memory_pro', 'memory_anti'],
+    delay_pro = True,
+    delay_anti = True,
+    memory_pro = True,
+    memory_anti = True,
+    dm_1 = False,
+    dm_2 = False,
     T = 100,
     num_trials = 500,
     # Training
@@ -52,14 +57,18 @@ config = wandb.config
 
 # unpack tasks
 task_list = []
-if 'delay_pro' in config['task_list']:
+if config['delay_pro']:
     task_list.append(sample_delay_pro)
-if 'delay_anti' in config['task_list']:
+if config['delay_anti']:
     task_list.append(sample_delay_anti)
-if 'memory_pro' in config['task_list']:
+if config['memory_pro']:
     task_list.append(sample_memory_pro)
-if 'memory_anti' in config['task_list']:
+if config['memory_anti']:
     task_list.append(sample_memory_anti)
+if config['dm_1']:
+    task_list.append(sample_dm1)
+if config['dm_2']:
+    task_list.append(sample_dm2)
 
 # data generation
 task_order, samples_in, samples_out = random_trials(
