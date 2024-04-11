@@ -131,8 +131,8 @@ wandb.log({'final_curves':wandb.Image(fig)}, commit=True)
 rank = config['R']
 key = jr.PRNGKey(13)
 T = 100
-task_list, samples_in, samples_out = one_of_each(key, T)
-task_labels = ['delay_pro', 'delay_anti', 'memory_pro', 'memory_anti']
+task_list_inds, samples_in, samples_out = one_of_each(key, task_list, T, fix_output=config['fix_output'])
+task_labels = [task.__name__[7:] for task in task_list]
 
 x0 = jnp.ones((100,))*0.1
 z0 = jnp.ones((5,))*0.1

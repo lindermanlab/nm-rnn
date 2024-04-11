@@ -360,10 +360,12 @@ def random_trials(key, task_list, T, num_trials, fix_output=False):
 
     return random_order, samples_in, samples_out
 
-def one_of_each(key, T, fix_output=False):
-    task_list = [sample_delay_pro, sample_delay_anti, sample_memory_pro, sample_memory_anti]
-    order = jnp.arange(4)
-    num_trials = 4
+#TODO: edit to take in task list
+def one_of_each(key, task_list, T, fix_output=False):
+    # function to sample one trial of each of the tasks in task_list
+    # currently can't handle dm_1 and dm_2 tasks (need to not hard-code 3 sensory inputs)
+    order = jnp.arange(len(task_list))
+    num_trials = len(task_list)
     num_tasks = num_trials
    
     sample_keys_trials = jr.split(key, num_trials)
