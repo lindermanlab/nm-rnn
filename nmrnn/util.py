@@ -10,7 +10,23 @@ import pickle
 
 import matplotlib.pyplot as plt
 
+def percent_correct(inputs, target_outputs, model_outputs):
+    num_samples = inputs.shape[0]
+    correct_count = 0
+    def _trial_correct(sample_in, sample_out, model_out):
+        assert sample_out.shape == model_out.shape, "sample_out and model_out are not same shape!"
+        time_fix_off = jnp.argmin(sample_in[0])
+        if (model_out[0, :time_fix_off] > 0.5).all():
+            if jnp.abs(decode_angle(sample_out[1:,-1]) - decode_angle(model_out[1:,-1])) < jnp.pi/5:
+                return 1
+            else: return 0
+        else: return 0
+    for i in range(num_samples):
+        correct_count += _trial_correct(inputs[i], target_outputs[i], model_outputs[i].T)
+    return correct_count/num_samples
+
 def decode_angle(sin_angle, cos_angle):
+    # decodes angle from sine/cosine readout, ignoring scaling
     return jnp.arctan(sin_angle/cos_angle)
 
 def random_nmrnn_params(key, u, n, r, m, k, o, g=1.0):
