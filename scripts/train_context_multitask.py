@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import wandb
 
 from nmrnn.data_generation import sample_memory_pro, sample_memory_anti, sample_delay_pro, sample_delay_anti, sample_dm1, sample_dm2, random_trials, one_of_each
-from nmrnn.util import random_nmrnn_params, log_wandb_model
+from nmrnn.util import random_nmrnn_params, log_wandb_model, percent_correct
 from nmrnn.fitting import fit_mwg_context_nm_rnn
 from nmrnn.rnn_code import batched_context_nm_rnn, context_nm_rnn
 
@@ -109,6 +109,21 @@ params, losses = fit_mwg_context_nm_rnn(task_samples_in.transpose((0,2,1)), cont
 
 # log model
 log_wandb_model(params, "multitask_context_nmrnn_r{}_n{}_m{}".format(config['R'],config['N'],config['M']), 'model')
+
+# log % correct
+# TODO: currently only works when training on set of 4 tasks
+if len(task_list) == 4:
+    samples_in_test = jnp.load('test_inputs.npy')
+    samples_out_test = jnp.load('test_outputs.npy')
+    x0 = jnp.ones((100,))*0.1
+    z0 = jnp.ones((5,))*0.1
+
+    task_samples_in_test = samples_in_test[:,:-len(task_list), :]
+    context_samples_in_test = samples_in_test[:,-len(task_list):, :]
+
+    ys_test, _, _ = batched_context_nm_rnn(params, x0, z0, task_samples_in_test.transpose((0,2,1)), context_samples_in_test.transpose((0,2,1)), config['tau_x'], config['tau_z'], config['orth_u'])
+
+    wandb.log({'percent_correct':percent_correct(samples_in_test, samples_out_test, ys_test)})
 
 # example outputs plot
 sample_task_inputs, sample_context_inputs, sample_targets, sample_masks = task_samples_in.transpose((0,2,1))[0], context_samples_in.transpose((0,2,1))[0], samples_out.transpose((0,2,1))[0], masks.transpose((0,2,1))[0] # grab a single trial to plot output

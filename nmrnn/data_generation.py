@@ -338,7 +338,7 @@ def sample_memory_anti(key,
 
     return jnp.vstack((fix_input, stim_input)), jnp.vstack((fix_output, response_output))
 
-def random_trials(key, task_list, T, num_trials, fix_output=False):
+def random_trials(key, task_list, T, num_trials, fix_output=True):
     key1, key2 = jr.split(key, 2)
     num_tasks = len(task_list)
     random_order = jr.choice(key1, num_tasks, shape=(num_trials,))
@@ -361,7 +361,7 @@ def random_trials(key, task_list, T, num_trials, fix_output=False):
     return random_order, samples_in, samples_out
 
 #TODO: edit to take in task list
-def one_of_each(key, task_list, T, fix_output=False):
+def one_of_each(key, task_list, T, fix_output=True):
     # function to sample one trial of each of the tasks in task_list
     # currently can't handle dm_1 and dm_2 tasks (need to not hard-code 3 sensory inputs)
     order = jnp.arange(len(task_list))

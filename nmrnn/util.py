@@ -10,6 +10,9 @@ import pickle
 
 import matplotlib.pyplot as plt
 
+def decode_angle(sin_angle, cos_angle):
+    return jnp.arctan(sin_angle/cos_angle)
+
 def random_nmrnn_params(key, u, n, r, m, k, o, g=1.0):
     """Generate random low-rank RNN parameters
 
