@@ -1,7 +1,4 @@
-!pip install wandb
 import wandb
-wandb.login()
-
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -23,10 +20,7 @@ import math
 from utils import *
 from nm_lr_rnn.py import *
 
-seq_len = 25
-batch_size = 128
-num_batches = 20000
-lr = 1e-2
+# default params
 # U = 1   # input dim
 # N = 18  # hidden state dim
 # R = 8   # rank of RNN
