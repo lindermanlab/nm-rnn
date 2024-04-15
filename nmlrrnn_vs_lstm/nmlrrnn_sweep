@@ -1,0 +1,103 @@
+!pip install wandb
+import wandb
+wandb.login()
+
+import jax
+import jax.numpy as jnp
+import jax.random as jr
+from jax import grad, vmap, jit
+from jax import lax
+from jax.tree_util import tree_map
+import optax
+import numpy as np
+
+import pickle as pkl
+
+import matplotlib.pyplot as plt
+import pdb
+
+from flax import linen as nn
+import functools
+import random
+import math
+from utils import *
+from nm_lr_rnn.py import *
+
+seq_len = 25
+batch_size = 128
+num_batches = 20000
+lr = 1e-2
+# U = 1   # input dim
+# N = 18  # hidden state dim
+# R = 8   # rank of RNN
+# M = 5  # dim nm
+# K = R   # rank R (factor specific) or 1 (global)
+# O = 1   # output dimension
+# tau_z = 10.
+# tau_x = 2.
+
+curr_key = jr.PRNGKey(13)
+
+def run_experiment(experiment_name, run, seq_len, batch_size, num_batches, lr, U, N, R, M, K, O, tau_z, tau_x, key):
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="testrun_nmlrrnn",
+        name=f'{experiment_name}_{run}',
+        group=experiment_name,
+        # track hyperparameters and run metadata
+        config={
+        "seq_len": seq_len,
+        "batch_size": batch_size,
+        "num_batches": num_batches,
+        "lr": lr,
+        "U": U,
+        "N": N,
+        "R": R,
+        "M": M,
+        "K": K,
+        "O": O,
+        "tau_z": tau_z,
+        "tau_x": tau_x
+        }
+    )
+
+    wandb.define_metric("loss", summary="min")
+
+    optimizer = optax.adam(0.01,0.9,0.999,1e-07)
+
+    key, skey, sskey = jr.split(key, 3)
+    x0 = jr.normal(skey, (N,)) / jnp.sqrt(N)
+    z0 = jr.normal(sskey, (M,)) / jnp.sqrt(M)
+
+    params = random_nmrnn_params(key, U, N, R, M, K, O)
+
+    params, best_params, losses, min_loss, lowest_loss_idx = fit_element_finder_nm_lrrnn(params, optimizer, x0, z0, num_batches, batch_size, tau_x, tau_z, seq_len, key)
+    wandb.run.summary["lowest_loss_idx"] = lowest_loss_idx
+
+    wandb.finish()
+
+def run_experiments(experiment_name, total_runs, curr_key, seq_len, batch_size, num_batches, lr, U, N, R, M, K, O, tau_z, tau_x):
+    for run in range(total_runs):
+        key, curr_key = jr.split(curr_key, 2)
+
+        run_experiment(experiment_name, run, seq_len, batch_size, num_batches, lr, U, N, R, M, K, O, tau_z, tau_x, curr_key)
+# start a new wandb run to track this script
+
+# Launch 10 simulated experiments
+total_runs = 10
+MNR_list = [(5, 18, 8), (5, 13, 12), (10, 14, 5), (10, 12, 7), (15, 6, 5)]
+
+seq_len = 25
+batch_size = 128
+num_batches = 20000
+lr = 1e-2
+
+U = 1
+K = R   # rank R (factor specific) or 1 (global)
+O = 1   # output dimension
+tau_z = 10.
+tau_x = 2.
+
+for i in range(len(MNR_list)):
+    M, N, R = MNR_list[i]
+    run_experiments(f'nmlrrnn_{M=}_{N=}_{R=}', total_runs, curr_key, seq_len, batch_size, num_batches, lr, U, N, R, M, K, O, tau_z, tau_x)
