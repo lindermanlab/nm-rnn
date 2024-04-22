@@ -20,6 +20,16 @@ import math
 import torch
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 
+def generate_tensor_sequences_and_inds(batch_size, seq_len, seq_bound=10):
+    sequences = torch.randint(-10, 10, (batch_size, seq_len))
+    inds = torch.randint(0, seq_len, (batch_size,))
+    inputs = torch.cat((inds.unsqueeze(-1), sequences), axis=1)
+
+    outputs = sequences[torch.arange(len(inds)), inds]
+
+    return inputs.unsqueeze(-1), outputs
+
+
 def generate_sequences_and_inds(batch_size, seq_len, key, seq_bound=10):
     key, skey, sskey = jr.split(key, 3)
     sequences = jr.randint(skey, (batch_size, seq_len), -seq_bound, seq_bound+1)
@@ -30,16 +40,16 @@ def generate_sequences_and_inds(batch_size, seq_len, key, seq_bound=10):
 
     return jnp.expand_dims(inputs, axis=-1), outputs
 
+def generate_sequences_and_selected_inds(batch_size, idx_choices, seq_len, key, seq_bound=10):
+    key, skey, sskey = jr.split(key, 3)
+    sequences = jr.randint(skey, (batch_size, seq_len), -seq_bound, seq_bound+1)
+    # inds = jr.randint(sskey, (batch_size, 1), idx_low, idx_high)
+    inds = jr.choice(sskey, idx_choices, shape=(batch_size, 1))
+    inputs = jnp.concatenate([inds, sequences], axis=1)
 
-def generate_tensor_sequences_and_inds(batch_size, seq_len, seq_bound=10):
-    sequences = torch.randint(-10, 10, (batch_size, seq_len))
-    inds = torch.randint(0, seq_len, (batch_size,))
-    inputs = torch.cat((inds.unsqueeze(-1), sequences), axis=1)
+    outputs = jnp.choose(inputs[:, 0], inputs[:, 1:].T)
 
-    outputs = sequences[torch.arange(len(inds)), inds]
-
-    return inputs.unsqueeze(-1), outputs
-
+    return jnp.expand_dims(inputs, axis=-1), outputs
 
 def generate_sequences_and_fixed_query(batch_size, idx, seq_len, key, seq_bound=10, fixed_value=None):
     assert idx >= 0 and idx < seq_len

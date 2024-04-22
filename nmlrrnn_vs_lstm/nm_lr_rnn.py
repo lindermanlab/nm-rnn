@@ -48,9 +48,6 @@ def nm_rnn(params, x0, z0, inputs, tau_x, tau_z, nln=jnp.tanh):
     W_zx = params['nm_feedback_weight']     # dim_nm x N
     b_z = params['nm_feedback_bias']        # dim_nm
 
-    # W_xz = params['input_gating_weight']    # N x dim_nm
-    # b_x = params['input_gating_bias']       # N
-
     N = x0.shape[0]
     R = U.shape[1]
 
@@ -82,6 +79,7 @@ def nm_rnn(params, x0, z0, inputs, tau_x, tau_z, nln=jnp.tanh):
 
 batched_nm_rnn = vmap(nm_rnn, in_axes=(None, None, None, 0, None, None))
 
+
 def random_nmrnn_params(key, u, n, r, m, k, o, g=1.0):
     """Generate random low-rank RNN parameters
 
@@ -94,6 +92,15 @@ def random_nmrnn_params(key, u, n, r, m, k, o, g=1.0):
     o:  number of outputs
     """
     skeys = jr.split(key, 12)
+
+    # row_factors = jnp.zeros((n,r))
+    # column_factors = jnp.zeros((n,r))
+
+    # for i in range(r):
+    #     sample = jr.multivariate_normal(key, jnp.zeros((2,)), jnp.array([[1.,0.8],[0.8,1.]]), shape=(n,))
+    #     # pdb.set_trace()
+    #     row_factors = row_factors.at[:,i].set(sample[:,0])
+    #     column_factors = column_factors.at[:,i].set(sample[:,1])
 
     return {'row_factors' : jr.normal(skeys[0], (n,r)) / jnp.sqrt(r), #row_factors,
             'column_factors' : jr.normal(skeys[1], (n,r)) / jnp.sqrt(r), # column_factors,
@@ -109,8 +116,7 @@ def random_nmrnn_params(key, u, n, r, m, k, o, g=1.0):
             # 'input_gating_bias' : jr.normal(skeys[11], (n,)) / jnp.sqrt(n)
             }
 
-
-def fit_element_finder_nm_lrrnn(params, optimizer, x0, z0, num_batches, batch_size, tau_x, tau_z, seq_len, key, loss_window_size=10):
+def fit_element_finder_nm_lrrnn(params, optimizer, x0, z0, num_batches, batch_size, tau_x, tau_z, seq_len, key, idx_choices=None, loss_window_size=10):
     opt_state = optimizer.init(params)
 
     @jit
@@ -127,61 +133,59 @@ def fit_element_finder_nm_lrrnn(params, optimizer, x0, z0, num_batches, batch_si
 
     losses = []
     min_loss = None
+    lowest_loss_idx = None
     lowest_loss_params = None
     for n in range(num_batches):
         key, subkey = jr.split(key, 2)
-        batch_inputs, batch_targets = generate_sequences_and_inds(batch_size, seq_len, subkey)
 
+        batch_inputs, batch_targets = None, None
+        if idx_choices is None:
+            batch_inputs, batch_targets = generate_sequences_and_inds(batch_size, seq_len, subkey)
+        else:
+            batch_inputs, batch_targets = generate_sequences_and_selected_inds(batch_size, idx_choices, seq_len, subkey)
 
         params, opt_state, loss_value = _step(params, opt_state, batch_inputs, batch_targets)
         losses.append(loss_value)
+        wandb.log({"loss": loss_value})
 
         if min_loss is None or loss_value < min_loss:
             min_loss = loss_value
             lowest_loss_params = params
+            lowest_loss_idx = n
 
         if n % 500 == 0:
             print(f'step {n}, loss: {loss_value}')
 
-            # sample_input, sample_target = batch_inputs[0], batch_targets[0]
-            # # print(sample_input.shape)
-            # sample_ys, sample_xs, sample_zs = nm_rnn(params, x0, z0, sample_input, tau_x, tau_z)
-            # print(sample_zs)
+    return params, lowest_loss_params, losses, min_loss, lowest_loss_idx
 
-    window_avgd_loss = 0
-    for j in range(1, loss_window_size+1):
-        window_avgd_loss += losses[-j]
-    window_avgd_loss = window_avgd_loss / loss_window_size
 
-    return params, lowest_loss_params, losses, min_loss, window_avgd_loss
+# if __name__ == "__main__":
+#     seq_len = 25
+#     batch_size = 128
+#     num_batches = 20000
+#     key = jr.PRNGKey(13)
 
-if __name__ == "__main__":
-    seq_len = 25
-    batch_size = 128
-    num_batches = 20000
-    key = jr.PRNGKey(13)
+#     optimizer = optax.adam(0.01, 0.9, 0.999, 1e-07)
 
-    optimizer = optax.adam(0.01, 0.9, 0.999, 1e-07)
+#     # good runset: (M, N, R) = (5, 18, 8)
 
-    # good runset: (M, N, R) = (5, 18, 8)
+#     # Initialization parameters
+#     U = 1  # input dim
+#     N = 18  # hidden state dim
+#     R = 8  # rank of RNN
+#     M = 5  # dim nm
+#     K = R  # rank R (factor specific) or 1 (global)
+#     O = 1  # output dimension
+#     tau_z = 10.
+#     tau_x = 2.
 
-    # Initialization parameters
-    U = 1  # input dim
-    N = 18  # hidden state dim
-    R = 8  # rank of RNN
-    M = 5  # dim nm
-    K = R  # rank R (factor specific) or 1 (global)
-    O = 1  # output dimension
-    tau_z = 10.
-    tau_x = 2.
+#     key, skey, sskey = jr.split(key, 3)
+#     x0 = jr.normal(skey, (N,)) / jnp.sqrt(N)
+#     z0 = jr.normal(sskey, (M,)) / jnp.sqrt(M)
 
-    key, skey, sskey = jr.split(key, 3)
-    x0 = jr.normal(skey, (N,)) / jnp.sqrt(N)
-    z0 = jr.normal(sskey, (M,)) / jnp.sqrt(M)
+#     params = random_nmrnn_params(key, U, N, R, M, K, O)
 
-    params = random_nmrnn_params(key, U, N, R, M, K, O)
-
-    params, lowest_loss_params, losses, min_loss, window_avgd_loss = fit_element_finder_nm_lrrnn(params, optimizer, x0,
-                                                                                                 z0, num_batches,
-                                                                                                 batch_size, tau_x,
-                                                                                                 tau_z, seq_len, key)
+#     params, lowest_loss_params, losses, min_loss, window_avgd_loss = fit_element_finder_nm_lrrnn(params, optimizer, x0,
+#                                                                                                  z0, num_batches,
+#                                                                                                  batch_size, tau_x,
+#                                                                                                  tau_z, seq_len, key)
