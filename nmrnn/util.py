@@ -17,7 +17,9 @@ def percent_correct(inputs, target_outputs, model_outputs):
         assert sample_out.shape == model_out.shape, "sample_out and model_out are not same shape!"
         time_fix_off = jnp.argmin(sample_in[0])
         if (model_out[0, :time_fix_off] > 0.5).all():
-            if jnp.abs(decode_angle(sample_out[1:,-1]) - decode_angle(model_out[1:,-1])) < jnp.pi/5:
+            dist = decode_angle(sample_out[1,-1],sample_out[2,-1]) - decode_angle(model_out[1, -1], model_out[2,-1])
+            diff = jnp.minimum(abs(dist), 2*jnp.pi-abs(dist))
+            if diff < jnp.pi/10:
                 return 1
             else: return 0
         else: return 0
@@ -40,7 +42,7 @@ def random_nmrnn_params(key, u, n, r, m, k, o, g=1.0):
     k:  dimension of NM input affecting weight matrix (either 1 or r)
     o:  number of outputs
     """
-    skeys = jr.split(key, 8)
+    skeys = jr.split(key, 9)
     #   hscale = 0.1
     ifactor = 1.0 / jnp.sqrt(u) # scaling of input weights
     # hfactor = g / jnp.sqrt(n) # scaling of recurrent weights
@@ -52,16 +54,11 @@ def random_nmrnn_params(key, u, n, r, m, k, o, g=1.0):
     row_factors = jr.normal(skeys[0],(n,r))
     column_factors = jr.normal(skeys[1],(n,r))
 
-    # for i in range(r): #TODO: split key
-    #     sample = jr.multivariate_normal(key, jnp.zeros((2,)), jnp.array([[1.,0.8],[0.8,1.]]), shape=(n,))
-    #     # pdb.set_trace()
-    #     row_factors = row_factors.at[:,i].set(sample[:,0])
-    #     column_factors = column_factors.at[:,i].set(sample[:,1])
-
     return {'row_factors' : row_factors,
             'column_factors' : column_factors,
             'input_weights' : jr.normal(skeys[2], (n,u))*ifactor,
             'readout_weights' : jr.normal(skeys[3], (o,n))*pfactor,
+            'readout_bias' : jr.normal(skeys[8], (o,))*pfactor,
             'nm_rec_weight' : jr.normal(skeys[4], (m,m))*0.1,
             'nm_input_weight' : jr.normal(skeys[5], (m,u))*ifactor,
             'nm_sigmoid_weight' : jr.normal(skeys[6], (k,m))*0.1,

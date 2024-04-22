@@ -113,6 +113,8 @@ def lin_sym_nm_rnn(params, x0, z0, inputs, tau_x, tau_z):
     V = U    # D x R
     B_xu = params["input_weights"]     # D x M
     C = params["readout_weights"]   # O x D
+    try: rb = params["readout_bias"]             # O
+    except: rb = jnp.zeros(C.shape[0])
     W_zz = params["nm_rec_weight"]         # dim_nm x dim_nm
     B_zu = params["nm_input_weight"]      # dim_nm x M
     m = params["nm_sigmoid_weight"]         # scalar
@@ -136,7 +138,7 @@ def lin_sym_nm_rnn(params, x0, z0, inputs, tau_x, tau_z):
         x += (1. / tau_x) * B_xu @ u
 
         # calculate y
-        y = C @ x
+        y = C @ x + rb
         return (x, z), (y, x, z)
 
     _, (ys, xs, zs) = lax.scan(_step, (x0, z0), inputs)
@@ -207,3 +209,8 @@ batched_context_nm_rnn = vmap(context_nm_rnn, in_axes=(None, None, None, 0, 0, N
 def batched_context_nm_rnn_loss(params, x0, z0, batch_task_inputs, batch_context_inputs, tau_x, tau_z, batch_targets, batch_mask, orth_u=True):
     ys, _, _ = batched_context_nm_rnn(params, x0, z0, batch_task_inputs, batch_context_inputs, tau_x, tau_z, orth_u)
     return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)
+
+# for training on only nm or lr params
+def batched_context_nm_rnn_loss_frozen(nm_params, other_params, x0, z0, task_inputs, context_inputs, tau_x, tau_z, targets, loss_masks, orth_u=True):
+    params = dict(nm_params, **other_params)
+    return batched_context_nm_rnn_loss(params, x0, z0, task_inputs, context_inputs, tau_x, tau_z, targets, loss_masks, orth_u=orth_u)
