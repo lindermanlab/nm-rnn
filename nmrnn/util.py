@@ -64,6 +64,33 @@ def random_nmrnn_params(key, u, n, r, m, k, o, g=1.0):
             'nm_sigmoid_weight' : jr.normal(skeys[6], (k,m))*0.1,
             'nm_sigmoid_intercept' : jr.normal(skeys[7], (k,))*0.1}
 
+def random_lrrnn_params(key, u, n, r, o, g=1.0):
+    """Generate random low-rank RNN parameters
+
+    Arguments:
+    u:  number of inputs
+    n:  number of neurons in main network
+    r:  rank of main network
+    o:  number of outputs
+    """
+    skeys = jr.split(key, 5)
+    #   hscale = 0.1
+    ifactor = 1.0 / jnp.sqrt(u) # scaling of input weights
+    # hfactor = g / jnp.sqrt(n) # scaling of recurrent weights
+    pfactor = 1.0 / jnp.sqrt(n) # scaling of output weights
+
+    row_factors = jnp.zeros((n,r))
+    column_factors = jnp.zeros((n,r))
+
+    row_factors = jr.normal(skeys[0],(n,r))
+    column_factors = jr.normal(skeys[1],(n,r))
+
+    return {'row_factors' : row_factors,
+            'column_factors' : column_factors,
+            'input_weights' : jr.normal(skeys[2], (n,u))*ifactor,
+            'readout_weights' : jr.normal(skeys[3], (o,n))*pfactor,
+            'readout_bias' : jr.normal(skeys[8], (o,))*pfactor}
+
 
 def log_wandb_model(model, name, type):
     trained_model_artifact = wandb.Artifact(name,type=type)

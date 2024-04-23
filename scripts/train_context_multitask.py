@@ -47,7 +47,7 @@ default_config = dict(
     num_full_train_iters = 100_000,
     keyind = 13,
     orth_u = True,
-    fix_output=False
+    fix_output=True
 )
 
 # wandb stuff
@@ -152,10 +152,10 @@ task_labels = [task.__name__[7:] for task in task_list]
 x0 = jnp.ones((100,))*0.1
 z0 = jnp.ones((5,))*0.1
 
-task_samples_in = samples_in[:,:config['U']-len(task_list), :]
-context_samples_in = samples_in[:,config['U']-len(task_list):, :]
+task_samples_in = samples_in[:,:-len(task_list), :]
+context_samples_in = samples_in[:,-len(task_list):, :]
 
-ys, xs, zs = batched_context_nm_rnn(params, x0, z0, task_samples_in.transpose((0,2,1)), context_samples_in.transpose((0,2,1)), 10, 100, config['orth_u'])
+ys, xs, zs = batched_context_nm_rnn(params, x0, z0, task_samples_in.transpose((0,2,1)), context_samples_in.transpose((0,2,1)), config['tau_x'], config['tau_z'], config['orth_u'])
 
 fig, axes = plt.subplots(rank, 1, figsize=[10,rank*2])
 
