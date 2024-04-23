@@ -160,7 +160,7 @@ ys, xs, zs = batched_context_nm_rnn(params, x0, z0, task_samples_in.transpose((0
 fig, axes = plt.subplots(rank, 1, figsize=[10,rank*2])
 
 for r, ax in enumerate(axes):
-    for i in range(4):
+    for i in range(len(task_list)):
         ax.plot(jax.nn.sigmoid((zs @ m.T + b)[i, :, r]), label=task_labels[i])
         ax.legend(loc='lower left')
         ax.set_ylabel('NM response')
