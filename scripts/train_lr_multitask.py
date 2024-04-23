@@ -102,14 +102,14 @@ if len(task_list) == 4:
     x0 = jnp.ones((100,))*0.1
     z0 = jnp.ones((5,))*0.1
 
-    ys_test, _, _ = batched_lr_rnn(params, x0, samples_in_test.transpose((0,2,1)), config['tau'], config['orth_u'])
+    ys_test, _ = batched_lr_rnn(params, x0, samples_in_test.transpose((0,2,1)), config['tau'], config['orth_u'])
 
     wandb.log({'percent_correct':percent_correct(samples_in_test, samples_out_test, ys_test)})
 
 # example outputs plot
 sample_inputs, sample_targets, sample_masks = samples_in.transpose((0,2,1))[0], samples_out.transpose((0,2,1))[0], masks.transpose((0,2,1))[0] # grab a single trial to plot output
 
-ys, _, zs = lr_rnn(params, x0, sample_inputs, config['tau'], orth_u=config['orth_u'])
+ys, _ = lr_rnn(params, x0, sample_inputs, config['tau'], orth_u=config['orth_u'])
 
 fig, ax = plt.subplots(1, 1, figsize=[10, 6])
 # ax0.xlabel('Timestep')
