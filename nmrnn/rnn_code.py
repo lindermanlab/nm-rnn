@@ -101,6 +101,11 @@ def batched_lr_rnn_loss(params, x0, batch_inputs, tau, batch_targets, batch_mask
     ys, _ = batched_lr_rnn(params, x0, batch_inputs, tau, orth_u)
     return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)
 
+# for training on only subset of params
+def batched_lr_rnn_loss_split(input_params, other_params, x0, inputs, tau_x, targets, loss_masks, orth_u=True):
+    params = dict(input_params, **other_params)
+    return batched_lr_rnn_loss(params, x0, inputs, tau_x, targets, loss_masks, orth_u=orth_u)
+
 # CODE FOR LINEAR SYMMETRIC NM-RNN
 def lin_sym_nm_rnn(params, x0, z0, inputs, tau_x, tau_z):
     """

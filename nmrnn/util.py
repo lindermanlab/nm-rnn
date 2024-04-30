@@ -97,7 +97,8 @@ def log_wandb_model(model, name, type):
     if not os.path.isdir('models'): os.mkdir('models')
     subdirectory = wandb.run.name
     filepath = os.path.join('models', subdirectory)
-    os.mkdir(filepath)
+    try: os.mkdir(filepath)
+    except: filepath=filepath
     obs_outfile = open(os.path.join(filepath, "model"), 'wb')
     pickle.dump(model, obs_outfile)
     obs_outfile.close()
