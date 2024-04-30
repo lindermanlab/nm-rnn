@@ -42,7 +42,8 @@ default_config = dict(
     keyind = 13,
     orth_u = True,
     fix_output=True,
-    retrain_lr = 1e-2
+    retrain_lr = 1e-2,
+    retrain_iters = 50_000
 )
 
 # wandb stuff
@@ -191,7 +192,7 @@ params, nm_only_losses = fit_context_nm_only(task_samples_in_heldout.transpose((
                                              optimizer, 
                                              x0, 
                                              z0, 
-                                             30_000,
+                                             config['retrain_iters'],
                                              config['tau_x'], 
                                              config['tau_z'], 
                                              wandb_log=True, 
