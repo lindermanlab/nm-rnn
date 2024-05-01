@@ -202,7 +202,7 @@ params, nm_only_losses = fit_context_nm_only(task_samples_in_heldout.transpose((
 log_wandb_model(params, "multitask_context_nmrnn_r{}_n{}_m{}_retrained".format(config['R'],config['N'],config['M']), 'model')
 
 # calc percent correct on trained datapoints
-ys_test, _, zs_test = batched_context_nm_rnn(params, x0, z0, task_samples_in_heldout.transpose((0,2,1)), context_samples_in_heldout.transpose((0,2,1)), 10, 100, True)
+ys_test, _, zs_test = batched_context_nm_rnn(params, x0, z0, task_samples_in_heldout.transpose((0,2,1)), context_samples_in_heldout.transpose((0,2,1)), config['tau_x'], config['tau_z'], True)
 
 wandb.log({'percent_correct_heldouttask_train':percent_correct(samples_in, samples_out, ys_test)})
 
