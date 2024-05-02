@@ -25,7 +25,7 @@ default_config = dict(
     N = 100,    # hidden state dim
     R = 4,      # rank of RNN
     U = 7,      # input dim (3+num_tasks)
-    O = 2,      # output dimension
+    O = 3,      # output dimension
     M = 5,      # NM dimension
     # got rid of K for now, set to R by default
     #K = 2,      # NM sigmoid dimension (must be 1 or R)
@@ -42,12 +42,14 @@ default_config = dict(
     dm_1 = False,
     dm_2 = False,
     T = 100,
-    num_trials = 500,
+    num_trials = 1000,
     # Training
     num_full_train_iters = 100_000,
     keyind = 13,
     orth_u = True,
-    fix_output=True
+    fix_output=True,
+    batch=True,
+    batch_size=100
 )
 
 # wandb stuff
@@ -102,10 +104,24 @@ init_params = random_nmrnn_params(key, config['U'], config['N'], config['R'],
 init_params['input_weights'] = init_params['input_weights'][:,:config['U']-len(task_list)]
 
 # train on all params
-params, losses = fit_mwg_context_nm_rnn(task_samples_in.transpose((0,2,1)), context_samples_in.transpose((0,2,1)), samples_out.transpose((0,2,1)), masks.transpose((0,2,1)),
-                                init_params, optimizer, x0, z0, config['num_full_train_iters'],
-                                config['tau_x'], config['tau_z'], 
-                                plots=False, wandb_log=True, final_wandb_plot=True, orth_u=config['orth_u'])
+params, losses = fit_mwg_context_nm_rnn(task_samples_in.transpose((0,2,1)), 
+                                        context_samples_in.transpose((0,2,1)), 
+                                        samples_out.transpose((0,2,1)), 
+                                        masks.transpose((0,2,1)),
+                                        init_params, 
+                                        optimizer, 
+                                        x0, 
+                                        z0, 
+                                        config['num_full_train_iters'],
+                                        config['tau_x'], 
+                                        config['tau_z'], 
+                                        plots=False, 
+                                        wandb_log=True, 
+                                        final_wandb_plot=True, 
+                                        orth_u=config['orth_u'], 
+                                        batch=config['batch'], 
+                                        batch_size=config['batch_size'], 
+                                        keyind=config['keyind'])
 
 # log model
 log_wandb_model(params, "multitask_context_nmrnn_r{}_n{}_m{}".format(config['R'],config['N'],config['M']), 'model')

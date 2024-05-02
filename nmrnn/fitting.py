@@ -12,6 +12,7 @@ import wandb
 from nmrnn.data_generation import sample_one
 from nmrnn.rnn_code import batched_nm_rnn_loss, nm_rnn, batched_lr_rnn_loss, lr_rnn, batched_nm_rnn_loss_frozen, lin_sym_nm_rnn, batched_lin_sym_nm_rnn_loss, context_nm_rnn, batched_context_nm_rnn_loss, batched_context_nm_rnn_loss_frozen,batched_lr_rnn_loss_split
 
+#TODO: add batching
 def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_iters, tau_x, tau_z,
                    wandb_log=False, orth_u=True): # training on full set of data
     opt_state = optimizer.init(params)
@@ -43,25 +44,35 @@ def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_i
 
 
 def fit_mwg_lr_rnn(inputs, targets, loss_masks, params, optimizer, x0, num_iters, tau, 
-                   wandb_log=False, orth_u=True): # training on full set of data
+                   wandb_log=False, orth_u=True, batch=False, batch_size=100, keyind=13): # training on full set of data
     opt_state = optimizer.init(params)
     N_data = inputs.shape[0]
+    key = jr.PRNGKey(keyind)
 
     @jit
     def _step(params_and_opt, input):
-        (params, opt_state) = params_and_opt
-        #pdb.set_breakpoint()
+        (params, opt_state, key) = params_and_opt
+        if batch: 
+            key, _ = jr.split(key, 2)
+            batch_inds = jr.choice(key, jnp.arange(N_data), shape=(batch_size,))
+            batch_inputs = inputs[batch_inds]
+            batch_targets = targets[batch_inds]
+            batch_masks = loss_masks[batch_inds]
+        else:
+            batch_inputs = inputs
+            batch_targets = targets
+            batch_masks = loss_masks
         loss_value, grads = jax.value_and_grad(batched_lr_rnn_loss)(params, x0, inputs, tau, targets, loss_masks, orth_u=orth_u)
         updates, opt_state = optimizer.update(grads, opt_state, params)
         params = optax.apply_updates(params, updates)
-        return (params, opt_state), (params, loss_value)
+        return (params, opt_state, key), (params, loss_value)
 
     losses = []
    
     best_loss = 1e6
     best_params = params
     for n in range(num_iters//1000):
-        (params,_), (_, loss_values) = lax.scan(_step, (params, opt_state), None, length=1000) #arange bc the inputs aren't changing
+        (params,_,_), (_, loss_values) = lax.scan(_step, (params, opt_state, key), None, length=1000) #arange bc the inputs aren't changing
         losses.append(loss_values)
         if loss_values[-1] < best_loss: 
             best_params = params
@@ -138,17 +149,30 @@ def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimi
 
 # training function which only feeds context input to NM
 def fit_mwg_context_nm_rnn(task_inputs, context_inputs, targets, loss_masks, params, optimizer, x0, z0, num_iters, tau_x, tau_z,
-                   plots=True, wandb_log=False, final_wandb_plot=False, orth_u=True): # training on full set of data
+                   plots=True, wandb_log=False, final_wandb_plot=False, orth_u=True, batch=False, batch_size=100, keyind=13): # added batch option
     opt_state = optimizer.init(params)
     N_data = task_inputs.shape[0]
+    key = jr.PRNGKey(keyind)
 
     @jit
     def _step(params_and_opt, input):
-        (params, opt_state) = params_and_opt
-        loss_value, grads = jax.value_and_grad(batched_context_nm_rnn_loss)(params, x0, z0, task_inputs, context_inputs, tau_x, tau_z, targets, loss_masks, orth_u=orth_u)
+        (params, opt_state, key) = params_and_opt
+        if batch: 
+            key, _ = jr.split(key, 2)
+            batch_inds = jr.choice(key, jnp.arange(N_data), shape=(batch_size,))
+            batch_context_inputs = context_inputs[batch_inds]
+            batch_task_inputs = task_inputs[batch_inds]
+            batch_targets = targets[batch_inds]
+            batch_masks = loss_masks[batch_inds]
+        else:
+            batch_task_inputs = task_inputs
+            batch_context_inputs = context_inputs
+            batch_targets = targets
+            batch_masks = loss_masks
+        loss_value, grads = jax.value_and_grad(batched_context_nm_rnn_loss)(params, x0, z0, batch_task_inputs, batch_context_inputs, tau_x, tau_z, batch_targets, batch_masks, orth_u=orth_u)
         updates, opt_state = optimizer.update(grads, opt_state, params)
         params = optax.apply_updates(params, updates)
-        return (params, opt_state), (params, loss_value)
+        return (params, opt_state, key), (params, loss_value)
 
     losses = []
     # sample_inputs, sample_targets, sample_masks = sample_one(jr.PRNGKey(1), T, intervals, measure_min, measure_max, delay, mask_pad)
@@ -158,7 +182,7 @@ def fit_mwg_context_nm_rnn(task_inputs, context_inputs, targets, loss_masks, par
     best_loss = 1e6
     best_params = params
     for n in range(num_iters//1000):
-        (params,_), (_, loss_values) = lax.scan(_step, (params, opt_state), None, length=1000) #arange bc the inputs aren't changing
+        (params,_,_), (_, loss_values) = lax.scan(_step, (params, opt_state, key), None, length=1000) #arange bc the inputs aren't changing
         losses.append(loss_values)
         print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
         if wandb_log: wandb.log({'loss':loss_values[-1]})
@@ -170,18 +194,30 @@ def fit_mwg_context_nm_rnn(task_inputs, context_inputs, targets, loss_masks, par
 
 # training function to fit only neuromodulatory parameters (context nm-rnn)
 def fit_context_nm_only(task_inputs, context_inputs, targets, loss_masks, nm_params, other_params, optimizer, x0, z0, num_iters, tau_x, tau_z,
-                    wandb_log=False, orth_u=True): # training on full set of data
+                    wandb_log=False, orth_u=True, batch=False, batch_size=100, keyind=13): # training on full set of data
     opt_state = optimizer.init(nm_params)
     N_data = task_inputs.shape[0]
+    key = jr.PRNGKey(keyind)
 
     @jit
     def _step(params_and_opt, input):
-        (nm_params, opt_state) = params_and_opt
-        #pdb.set_breakpoint()
-        loss_value, grads = jax.value_and_grad(batched_context_nm_rnn_loss_frozen)(nm_params, other_params, x0, z0, task_inputs, context_inputs, tau_x, tau_z, targets, loss_masks, orth_u=orth_u)
+        (nm_params, opt_state, key) = params_and_opt
+        if batch: 
+            key, _ = jr.split(key, 2)
+            batch_inds = jr.choice(key, jnp.arange(N_data), shape=(batch_size,))
+            batch_context_inputs = context_inputs[batch_inds]
+            batch_task_inputs = task_inputs[batch_inds]
+            batch_targets = targets[batch_inds]
+            batch_masks = loss_masks[batch_inds]
+        else:
+            batch_task_inputs = task_inputs
+            batch_context_inputs = context_inputs
+            batch_targets = targets
+            batch_masks = loss_masks
+        loss_value, grads = jax.value_and_grad(batched_context_nm_rnn_loss_frozen)(nm_params, other_params, x0, z0, batch_task_inputs, batch_context_inputs, tau_x, tau_z, batch_targets, batch_masks, orth_u=orth_u)
         updates, opt_state = optimizer.update(grads, opt_state, nm_params)
         nm_params = optax.apply_updates(nm_params, updates)
-        return (nm_params, opt_state), (nm_params, loss_value)
+        return (nm_params, opt_state, key), (nm_params, loss_value)
 
     losses = []
 
@@ -190,7 +226,7 @@ def fit_context_nm_only(task_inputs, context_inputs, targets, loss_masks, nm_par
     best_params = params
     for n in range(num_iters//1000):
         # (params, opt_state), loss_value = _step((params, opt_state))
-        (nm_params,_), (_, loss_values) = lax.scan(_step, (nm_params, opt_state), None, length=1000) #arange bc the inputs aren't changing
+        (nm_params,_,_), (_, loss_values) = lax.scan(_step, (nm_params, opt_state,key), None, length=1000) #arange bc the inputs aren't changing
         params = dict(nm_params, **other_params)
         losses.append(loss_values)
         losses.append(loss_values)
@@ -200,23 +236,32 @@ def fit_context_nm_only(task_inputs, context_inputs, targets, loss_masks, nm_par
             best_params = params
             best_loss = loss_values[-1]
 
-
     return best_params, losses
 
 # training function to fit only input weights in low-rank RNN (comparison to only training NM in nm-rnn)
 def fit_lr_inputweights_only(inputs, targets, loss_masks, input_params, other_params, optimizer, x0, num_iters, tau_x,
-                    wandb_log=False, orth_u=True): # training on full set of data
+                    wandb_log=False, orth_u=True, batch=False, batch_size=100, keyind=13): # training on full set of data
     opt_state = optimizer.init(input_params)
     N_data = inputs.shape[0]
+    key = jr.PRNGKey(keyind)
 
     @jit
     def _step(params_and_opt, input):
-        (input_params, opt_state) = params_and_opt
-        #pdb.set_breakpoint()
-        loss_value, grads = jax.value_and_grad(batched_lr_rnn_loss_split)(input_params, other_params, x0, inputs, tau_x, targets, loss_masks, orth_u=orth_u)
+        (input_params, opt_state, key) = params_and_opt
+        if batch: 
+            key, _ = jr.split(key, 2)
+            batch_inds = jr.choice(key, jnp.arange(N_data), shape=(batch_size,))
+            batch_inputs = inputs[batch_inds]
+            batch_targets = targets[batch_inds]
+            batch_masks = loss_masks[batch_inds]
+        else:
+            batch_inputs = inputs
+            batch_targets = targets
+            batch_masks = loss_masks
+        loss_value, grads = jax.value_and_grad(batched_lr_rnn_loss_split)(input_params, other_params, x0, batch_inputs, tau_x, batch_targets, batch_masks, orth_u=orth_u)
         updates, opt_state = optimizer.update(grads, opt_state, input_params)
         input_params = optax.apply_updates(input_params, updates)
-        return (input_params, opt_state), (input_params, loss_value)
+        return (input_params, opt_state, key), (input_params, loss_value)
 
     losses = []
 
@@ -225,7 +270,7 @@ def fit_lr_inputweights_only(inputs, targets, loss_masks, input_params, other_pa
     best_params = params
     for n in range(num_iters//1000):
         # (params, opt_state), loss_value = _step((params, opt_state))
-        (input_params,_), (_, loss_values) = lax.scan(_step, (input_params, opt_state), None, length=1000) #arange bc the inputs aren't changing
+        (input_params,_,_), (_, loss_values) = lax.scan(_step, (input_params, opt_state,key), None, length=1000) #arange bc the inputs aren't changing
         params = dict(input_params, **other_params)
         losses.append(loss_values)
         print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
@@ -233,7 +278,6 @@ def fit_lr_inputweights_only(inputs, targets, loss_masks, input_params, other_pa
         if loss_values[-1] < best_loss: 
             best_params = params
             best_loss = loss_values[-1]
-
 
     return best_params, losses
 
