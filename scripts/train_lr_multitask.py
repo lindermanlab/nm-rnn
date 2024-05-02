@@ -38,7 +38,9 @@ default_config = dict(
     num_full_train_iters = 100_000,
     keyind = 13,
     orth_u = True,
-    fix_output=True
+    fix_output=True,
+    batch=True,
+    batch_size=100
 )
 
 # wandb stuff
@@ -86,10 +88,18 @@ init_params = random_lrrnn_params(key, config['U'], config['N'],
                                   config['R'], config['O'])
 
 # train on all params
-params, losses = fit_mwg_lr_rnn(samples_in.transpose((0,2,1)), samples_out.transpose((0,2,1)), masks.transpose((0,2,1)),
-                                init_params, optimizer, x0, config['num_full_train_iters'],
+params, losses = fit_mwg_lr_rnn(samples_in.transpose((0,2,1)), 
+                                samples_out.transpose((0,2,1)), 
+                                masks.transpose((0,2,1)),
+                                init_params, 
+                                optimizer, 
+                                x0, 
+                                config['num_full_train_iters'],
                                 config['tau'], 
-                                wandb_log=True, orth_u=config['orth_u'])
+                                wandb_log=True, 
+                                orth_u=config['orth_u'],
+                                batch=config['batch'],
+                                batch_size=config['batch_size'])
 
 # log model
 log_wandb_model(params, "multitask_context_lrrnn_r{}_n{}".format(config['R'],config['N']), 'model')
