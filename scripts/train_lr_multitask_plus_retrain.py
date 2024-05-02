@@ -41,6 +41,7 @@ default_config = dict(
     fix_output=True,
     retrain_lr = 1e-2,
     retrain_iters = 50_000,
+    num_retrain_trials = 1000,
     batch=True,
     batch_size=100
 )
@@ -141,7 +142,7 @@ task_order, samples_in, samples_out = random_trials(
     jr.PRNGKey(config['keyind']), 
     task_list, 
     config['T'], 
-    100)
+    config['num_retrain_trials'])
 
 # make new context input
 samples_in_heldout = jnp.zeros((100,7,100))

@@ -36,14 +36,17 @@ default_config = dict(
     dm_1 = False,
     dm_2 = False,
     T = 100,
-    num_trials = 300,
+    num_trials = 3000,
     # Training
     num_full_train_iters = 100_000,
     keyind = 13,
     orth_u = True,
     fix_output=True,
     retrain_lr = 1e-2,
-    retrain_iters = 50_000
+    retrain_iters = 50_000,
+    num_retrain_trials = 1000,
+    batch=True,
+    batch_size=100
 )
 
 # wandb stuff
@@ -112,7 +115,10 @@ params, losses = fit_mwg_context_nm_rnn(task_samples_in.transpose((0,2,1)),
                                         plots=False, 
                                         wandb_log=True, 
                                         final_wandb_plot=True, 
-                                        orth_u=config['orth_u'])
+                                        orth_u=config['orth_u'],
+                                        batch=config['batch'], 
+                                        batch_size=config['batch_size'], 
+                                        keyind=config['keyind'])
 
 # log model
 log_wandb_model(params, "multitask_context_nmrnn_r{}_n{}_m{}".format(config['R'],config['N'],config['M']), 'model')
@@ -155,7 +161,7 @@ task_order, samples_in, samples_out = random_trials(
     jr.PRNGKey(config['keyind']), 
     task_list, 
     config['T'], 
-    100)
+    config['num_retrain_trials'])
 
 # make new context input
 samples_in_heldout = jnp.zeros((100,7,100))
@@ -196,7 +202,10 @@ params, nm_only_losses = fit_context_nm_only(task_samples_in_heldout.transpose((
                                              config['tau_x'], 
                                              config['tau_z'], 
                                              wandb_log=True, 
-                                             orth_u=config['orth_u'])
+                                             orth_u=config['orth_u'],
+                                             batch=config['batch'], 
+                                             batch_size=config['batch_size'], 
+                                             keyind=config['keyind'])
 
 # log retrained model
 log_wandb_model(params, "multitask_context_nmrnn_r{}_n{}_m{}_retrained".format(config['R'],config['N'],config['M']), 'model')
