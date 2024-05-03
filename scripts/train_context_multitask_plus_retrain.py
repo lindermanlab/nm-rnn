@@ -18,8 +18,8 @@ default_config = dict(
     # model parameters
     N = 100,    # hidden state dim
     R = 4,      # rank of RNN
-    U = 7,      # input dim (3+num_tasks)
-    O = 2,      # output dimension
+    U = 6,      # input dim (3+num_tasks)
+    O = 3,      # output dimension
     M = 5,      # NM dimension
     # got rid of K for now, set to R by default
     #K = 2,      # NM sigmoid dimension (must be 1 or R)
@@ -46,7 +46,9 @@ default_config = dict(
     retrain_iters = 50_000,
     num_retrain_trials = 1000,
     batch=True,
-    batch_size=100
+    batch_size=100,
+    input_noise=False,
+    input_noise_sigma=0.1
 )
 
 # wandb stuff
@@ -75,7 +77,9 @@ task_order, samples_in, samples_out = random_trials(
     task_list, 
     config['T'], 
     config['num_trials'],
-    config['fix_output'])
+    config['fix_output'],
+    noise=config['input_noise'],
+    noise_sigma=config['input_noise_sigma'])
 
 # separate out task and context inputs
 task_samples_in = samples_in[:,:config['U']-len(task_list), :]
@@ -161,11 +165,14 @@ task_order, samples_in, samples_out = random_trials(
     jr.PRNGKey(config['keyind']), 
     task_list, 
     config['T'], 
-    config['num_retrain_trials'])
+    config['num_retrain_trials'],
+    noise=config['input_noise'],
+    noise_sigma=config['input_noise_sigma'])
 
 # make new context input
 samples_in_heldout = jnp.zeros((config['num_retrain_trials'],7,100))
 samples_in_heldout = samples_in_heldout.at[:,:3,:].set(samples_in[:,:3,:]) # sensory inputs are the same
+samples_in_heldout = samples_in_heldout.at[:,3:-1,:].set(config['input_noise_sigma']*jr.normal(jr.PRNGKey(config['keyind']),samples_in_heldout[:,3:-1,:].shape)) # add noise to new channels
 samples_in_heldout = samples_in_heldout.at[:,-1,:].set(samples_in[:,-1,:]) # add new one-hot input for new task
 task_samples_in_heldout = samples_in_heldout[:,:-4, :]
 context_samples_in_heldout = samples_in_heldout[:,-4:, :]
