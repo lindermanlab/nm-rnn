@@ -62,7 +62,7 @@ def fit_mwg_lr_rnn(inputs, targets, loss_masks, params, optimizer, x0, num_iters
             batch_inputs = inputs
             batch_targets = targets
             batch_masks = loss_masks
-        loss_value, grads = jax.value_and_grad(batched_lr_rnn_loss)(params, x0, inputs, tau, targets, loss_masks, orth_u=orth_u)
+        loss_value, grads = jax.value_and_grad(batched_lr_rnn_loss)(params, x0, batch_inputs, tau, batch_targets, batch_masks, orth_u=orth_u)
         updates, opt_state = optimizer.update(grads, opt_state, params)
         params = optax.apply_updates(params, updates)
         return (params, opt_state, key), (params, loss_value)
