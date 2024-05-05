@@ -132,7 +132,7 @@ log_wandb_model(params, "multitask_context_nmrnn_r{}_n{}_m{}".format(config['R']
 samples_in_test = jnp.load('test_inputs.npy')[:75,:6]
 samples_out_test = jnp.load('test_outputs.npy')[:75]
 samples_labels_test = jnp.load('test_labels.npy')[:75]
-x0 = jnp.ones((100,))*0.1
+x0 = jnp.ones((config['N'],))*0.1
 z0 = jnp.ones((config['M'],))*0.1
 
 task_samples_in_test = samples_in_test[:,:-3, :]
