@@ -15,7 +15,7 @@ def percent_correct(inputs, target_outputs, model_outputs):
     correct_count = 0
     def _trial_correct(sample_in, sample_out, model_out):
         assert sample_out.shape == model_out.shape, "sample_out and model_out are not same shape!"
-        time_fix_off = jnp.argmin(sample_in[0])
+        time_fix_off = jnp.argmax(sample_in[0]<0.5)
         if (model_out[0, :time_fix_off] > 0.5).all():
             dist = decode_angle(sample_out[1,-1],sample_out[2,-1]) - decode_angle(model_out[1, -1], model_out[2,-1])
             diff = jnp.minimum(abs(dist), 2*jnp.pi-abs(dist))
