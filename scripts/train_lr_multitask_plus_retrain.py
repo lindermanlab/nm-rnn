@@ -198,6 +198,6 @@ samples_out_test = jnp.load('test_outputs.npy')[75:]
 samples_labels_test = jnp.load('test_labels.npy')[75:]
 x0 = jnp.ones((config['N'],))*0.1
 
-ys_test, _, zs_test = batched_lr_rnn(params, x0, samples_in_test.transpose((0,2,1)), config['tau'], True)
+ys_test, _ = batched_lr_rnn(params, x0, samples_in_test.transpose((0,2,1)), config['tau'], True)
 
 wandb.log({'percent_correct_heldouttask_test':percent_correct(samples_in_test, samples_out_test, ys_test)})

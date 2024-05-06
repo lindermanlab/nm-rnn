@@ -170,7 +170,7 @@ task_order, samples_in, samples_out = random_trials(
     noise_sigma=config['input_noise_sigma'])
 
 # make new context input
-samples_in_heldout = jnp.zeros((config['num_retrain_trials'],7,100))
+samples_in_heldout = jnp.zeros((config['num_retrain_trials'],config['U']+1,config['T']))
 samples_in_heldout = samples_in_heldout.at[:,:3,:].set(samples_in[:,:3,:]) # sensory inputs are the same
 samples_in_heldout = samples_in_heldout.at[:,3:-1,:].set(config['input_noise_sigma']*jr.normal(jr.PRNGKey(config['keyind']),samples_in_heldout[:,3:-1,:].shape)) # add noise to new channels
 samples_in_heldout = samples_in_heldout.at[:,-1,:].set(samples_in[:,-1,:]) # add new one-hot input for new task
