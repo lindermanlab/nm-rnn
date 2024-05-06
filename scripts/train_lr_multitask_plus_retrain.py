@@ -121,7 +121,7 @@ x0 = jnp.ones((config['N'],))*0.1
 task_samples_in_test = samples_in_test[:,:-3, :]
 context_samples_in_test = samples_in_test[:,-3:, :]
 
-ys_test, _, zs_test = batched_lr_rnn(params, x0, samples_in_test.transpose((0,2,1)), config['tau'], True)
+ys_test, _ = batched_lr_rnn(params, x0, samples_in_test.transpose((0,2,1)), config['tau'], True)
 
 wandb.log({'percent_correct_threetask_test':percent_correct(samples_in_test, samples_out_test, ys_test)})
 
@@ -151,7 +151,7 @@ task_order, samples_in, samples_out = random_trials(
     noise_sigma=config['input_noise_sigma'])
 
 # make new context input
-samples_in_heldout = jnp.zeros((config['num_retrain_trials'],7,100))
+samples_in_heldout = jnp.zeros((config['num_retrain_trials'],config['U']+1,config['T']))
 samples_in_heldout = samples_in_heldout.at[:,:3,:].set(samples_in[:,:3,:]) # sensory inputs are the same
 samples_in_heldout = samples_in_heldout.at[:,3:-1,:].set(config['input_noise_sigma']*jr.normal(jr.PRNGKey(config['keyind']),samples_in_heldout[:,3:-1,:].shape)) # add noise to new channels
 samples_in_heldout = samples_in_heldout.at[:,-1,:].set(samples_in[:,-1,:]) # add new one-hot input for new task
@@ -188,7 +188,7 @@ params, input_only_losses = fit_lr_inputweights_only(samples_in_heldout.transpos
 log_wandb_model(params, "multitask_context_lrrnn_r{}_n{}_retrained".format(config['R'],config['N']), 'model')
 
 # calc percent correct on trained datapoints
-ys_test, _, zs_test = batched_lr_rnn(params, x0, samples_in_heldout.transpose((0,2,1)), config['tau'], True)
+ys_test, _ = batched_lr_rnn(params, x0, samples_in_heldout.transpose((0,2,1)), config['tau'], True)
 
 wandb.log({'percent_correct_heldouttask_train':percent_correct(samples_in, samples_out, ys_test)})
 
@@ -197,7 +197,6 @@ samples_in_test = jnp.load('test_inputs.npy')[75:]
 samples_out_test = jnp.load('test_outputs.npy')[75:]
 samples_labels_test = jnp.load('test_labels.npy')[75:]
 x0 = jnp.ones((config['N'],))*0.1
-z0 = jnp.ones((config['M'],))*0.1
 
 ys_test, _, zs_test = batched_lr_rnn(params, x0, samples_in_test.transpose((0,2,1)), config['tau'], True)
 
