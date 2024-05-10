@@ -102,7 +102,8 @@ def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimi
     sample_inputs, sample_targets, sample_masks = inputs[0], targets[0], loss_masks[0]  # grab a single trial to plot output
     
     best_loss = 1e6
-    best_params = params
+    best_nm_params = nm_params
+
     for n in range(num_iters//1000):
         # (params, opt_state), loss_value = _step((params, opt_state))
         (nm_params,_), (_, loss_values) = lax.scan(_step, (nm_params, opt_state), None, length=1000) #arange bc the inputs aren't changing
@@ -111,7 +112,7 @@ def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimi
         print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
         if wandb_log: wandb.log({'loss':loss_values[-1]})
         if loss_values[-1] < best_loss: 
-            best_params = params
+            best_nm_params = nm_params
             best_loss = loss_values[-1]
 
         params = dict(nm_params, **other_params)
@@ -145,6 +146,7 @@ def fit_mwg_nm_only(inputs, targets, loss_masks, nm_params, other_params, optimi
         ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
         wandb.log({'nm_only_curves':wandb.Image(fig)}, commit=True)
 
+    best_params = dict(best_nm_params, **other_params)
     return best_params, losses
 
 # training function which only feeds context input to NM
@@ -283,7 +285,7 @@ def fit_lr_inputweights_only(inputs, targets, loss_masks, input_params, other_pa
 
 # training function to fit only low-rank parameters 
 def fit_mwg_lr_only(inputs, targets, loss_masks, nm_params, lr_params, optimizer, x0, z0, num_iters, tau_x, tau_z,
-                    plots=False, wandb_log=False, final_wandb_plot=False): # training on full set of data
+                    plots=False, wandb_log=False, final_wandb_plot=False, orth_u=True): # training on full set of data
     opt_state = optimizer.init(lr_params)
     N_data = inputs.shape[0]
 
@@ -300,7 +302,8 @@ def fit_mwg_lr_only(inputs, targets, loss_masks, nm_params, lr_params, optimizer
     sample_inputs, sample_targets, sample_masks = inputs[0], targets[0], loss_masks[0]  # grab a single trial to plot output
     
     best_loss = 1e6
-    best_params = params
+    best_lr_params = lr_params
+
     for n in range(num_iters//1000):
         # (params, opt_state), loss_value = _step((params, opt_state))
         (lr_params,_), (_, loss_values) = lax.scan(_step, (lr_params, opt_state), None, length=1000) #arange bc the inputs aren't changing
@@ -309,11 +312,11 @@ def fit_mwg_lr_only(inputs, targets, loss_masks, nm_params, lr_params, optimizer
         print(f'step {(n+1)*1000}, loss: {loss_values[-1]}')
         if wandb_log: wandb.log({'loss':loss_values[-1]})
         if loss_values[-1] < best_loss: 
-            best_params = params
+            best_lr_params = lr_params
             best_loss = loss_values[-1]
 
         params = dict(nm_params, **lr_params)
-        ys, _, zs = nm_rnn(params, x0, z0, sample_inputs, tau_x, tau_z)
+        ys, _, zs = nm_rnn(params, x0, z0, sample_inputs, tau_x, tau_z, orth_u=orth_u)
 
         if plots:
             # plt.figure(figsize=[10,6])
@@ -343,6 +346,7 @@ def fit_mwg_lr_only(inputs, targets, loss_masks, nm_params, lr_params, optimizer
         ax1.plot(jax.nn.sigmoid((zs @ m.T + b)))
         wandb.log({'nm_only_curves':wandb.Image(fig)}, commit=True)
 
+    best_params = dict(nm_params, **best_lr_params)
     return best_params, losses
 
 # training function for simplified case

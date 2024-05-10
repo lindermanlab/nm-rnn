@@ -54,7 +54,7 @@ def nm_rnn(params, x0, z0, inputs, tau_x, tau_z, orth_u, nln=jnp.tanh):
 
     return ys, xs, zs
 
-batched_nm_rnn = vmap(nm_rnn, in_axes=(None, None, None, 0, None, None, None, None))
+batched_nm_rnn = vmap(nm_rnn, in_axes=(None, None, None, 0, None, None, None))
 
 def batched_nm_rnn_loss(params, x0, z0, batch_inputs, tau_x, tau_z, batch_targets, batch_mask, orth_u=True):
     ys, _, _ = batched_nm_rnn(params, x0, z0, batch_inputs, tau_x, tau_z, orth_u)

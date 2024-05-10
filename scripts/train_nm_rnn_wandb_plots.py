@@ -69,13 +69,13 @@ init_params = random_nmrnn_params(key, config['U'], config['N'], config['R'],
 
 # split parameters for now
 nm_params = {k: init_params[k] for k in ('nm_rec_weight', 'nm_input_weight', 'nm_sigmoid_weight', 'nm_sigmoid_intercept')}
-lr_params = {k: init_params[k] for k in ('row_factors', 'column_factors', 'input_weights', 'readout_weights')}
+lr_params = {k: init_params[k] for k in ('row_factors', 'column_factors', 'input_weights', 'readout_weights', 'readout_bias')}
 
 if config['num_lr_only_iters'] != 0:
     params, lr_only_losses = fit_mwg_lr_only(all_inputs, all_outputs, all_masks, nm_params,
                                     lr_params, optimizer, x0, z0, config['num_lr_only_iters'],
                                             config['tau_x'], config['tau_z'], plots=False, wandb_log=True, final_wandb_plot=False)
-    lr_params = {k: params[k] for k in ('row_factors', 'column_factors', 'input_weights', 'readout_weights')}
+    lr_params = {k: params[k] for k in ('row_factors', 'column_factors', 'input_weights', 'readout_weights', 'readout_bias')}
 
 if config['num_nm_only_iters'] != 0:
 # # train on nm params only for a bit
@@ -86,7 +86,7 @@ if config['num_nm_only_iters'] != 0:
 # train on all params
 params, losses = fit_mwg_nm_rnn(all_inputs, all_outputs, all_masks,
                                 params, optimizer, x0, z0, config['num_full_train_iters'],
-                                config['tau_x'], config['tau_z'], plots=False, wandb_log=True, final_wandb_plot=True)
+                                config['tau_x'], config['tau_z'], wandb_log=True)
 
 # log model
 log_wandb_model(params, "nmrnn_r{}_n{}_m{}".format(config['R'],config['N'],config['M']), 'model')
@@ -105,7 +105,7 @@ new_inputs, new_outputs, new_masks = sample_all(config['T'],
             measure_max,
             config['delay'],)
 
-ys, _, zs = batched_nm_rnn(params, x0, z0, new_inputs, config['tau_x'], config['tau_z'])
+ys, _, zs = batched_nm_rnn(params, x0, z0, new_inputs, config['tau_x'], config['tau_z'], True)
 
 ################## plot aligned to start
 m = params['nm_sigmoid_weight']
