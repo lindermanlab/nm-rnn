@@ -28,7 +28,7 @@ default_config = dict(
     intervals = [[12, 14, 16, 18]],
     delay = 15,
     # Training
-    num_full_train_iters = 10_000,
+    num_full_train_iters = 50_000,
     keyind = 13,
 )
 
