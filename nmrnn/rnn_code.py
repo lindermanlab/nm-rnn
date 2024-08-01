@@ -222,3 +222,83 @@ def batched_context_nm_rnn_loss(params, x0, z0, batch_task_inputs, batch_context
 def batched_context_nm_rnn_loss_frozen(nm_params, other_params, x0, z0, task_inputs, context_inputs, tau_x, tau_z, targets, loss_masks, orth_u=True):
     params = dict(nm_params, **other_params)
     return batched_context_nm_rnn_loss(params, x0, z0, task_inputs, context_inputs, tau_x, tau_z, targets, loss_masks, orth_u=orth_u)
+
+def simple_lstm(params, c0, h0, inputs, gate_fn=jax.nn.sigmoid, activation_fn=jnp.tanh):
+    """
+    Arguments:
+    - params: dict of LSTM weights and cell states
+    - c0: initial cell (memory) state
+    - h0: initial hidden state
+    - inputs: sequence of inputs passed in, with batch dims first
+    """
+    # N -- hidden size, M -- input_size, O -- output_size
+
+    # (c0, h0) = init_carry
+
+    N = h0.shape[0] # hidden size of LSTM
+
+    W_iu = params['weights_iu']     # N x M
+    W_ih = params['weights_ih']     # N x N
+    b_ih = params['bias_ih']        # scalar
+
+    W_fu = params['weights_fu']     # N x M
+    W_fh = params['weights_fh']     # N x N
+    b_fh = params['bias_fh']        # scalar
+
+    W_gu = params['weights_gu']     # N x M
+    W_gh = params['weights_gh']     # N x N
+    b_gh = params['bias_gh']        # scalar
+
+    W_ou = params['weights_ou']     # N x M
+    W_oh = params['weights_oh']     # N x N
+    b_oh = params['bias_oh']        # scalar
+
+    C = params["readout_weights"]   # O x N
+
+    def _step(carry, u):
+        c, h = carry
+        i = gate_fn(W_iu @ u + W_ih @ h + b_ih)
+        f = gate_fn(W_fu @ u + W_fh @ h + b_fh)
+        g = activation_fn(W_gu @ u + W_gh @ h + b_gh)
+        o = gate_fn(W_ou @ u + W_oh @ h + b_oh)
+
+        new_c = f * c + i * g
+        new_h = o * activation_fn(new_c)
+
+        y = C @ new_h
+
+        return (new_c, new_h), y
+
+    if 'embedding_weights' in params:
+      embedding = params['embedding_weights']
+      inputs = embedding[inputs]    # make input batch_size x max_len x num_features in the case of text sentiment analysis
+
+    carry, y = lax.scan(_step, (c0, h0), inputs)
+    return carry, y
+
+def initialize_carry(hidden_size, key):
+    key1, key2 = jr.split(key)
+    mem_shape = (hidden_size, )
+    scale_factor = 1.0 / jnp.sqrt(hidden_size)
+
+    c = jr.normal(key1, mem_shape) * scale_factor
+    h = jr.normal(key2, mem_shape) * scale_factor
+    carry = (c, h)
+    return carry
+
+# should initial carry also be batched?
+batched_simple_lstm = vmap(simple_lstm, in_axes=(None, None, None, 0))
+
+def lstm_batched_loss(params, c0, h0, batch_inputs, batch_targets):
+    _, ys = batched_simple_lstm(params, c0, h0, batch_inputs)
+    return jnp.mean(((ys - batch_targets)**2))
+
+def initialize_carry(hidden_size, key):
+    key1, key2 = jr.split(key)
+    mem_shape = (hidden_size, )
+    scale_factor = 1.0 / jnp.sqrt(hidden_size)
+
+    c = jr.normal(key1, mem_shape) * scale_factor
+    h = jr.normal(key2, mem_shape) * scale_factor
+    carry = (c, h)
+    return carry

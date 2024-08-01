@@ -112,3 +112,33 @@ def load_wandb_model(filepath):
     model = pickle.load(model_infile)
     model_infile.close()
     return model
+
+def random_lstm_params(key, u, n, o, embed_size=None, n_embeds=None):
+    """Generate random LSTM parameters"""
+
+    skeys = jr.split(key, 14)
+    lstm_inp = u
+    if embed_size is not None:
+        assert n_embeds is not None
+        lstm_inp = embed_size
+
+    ifactor = 1.0 / jnp.sqrt(lstm_inp) # scaling of input weights
+    hfactor = 1.0 / jnp.sqrt(n) # scaling of recurrent weights
+    pfactor = 1.0 / jnp.sqrt(n) # scaling of output weights
+    params = {'weights_iu' : jr.normal(skeys[0], (n,lstm_inp)) * ifactor,
+            'weights_ih' : jr.normal(skeys[1], (n,n)) * hfactor,
+            'bias_ih'  : jr.normal(skeys[2], (n,)) * hfactor,
+            'weights_fu' : jr.normal(skeys[3], (n,lstm_inp)) * ifactor,
+            'weights_fh' : jr.normal(skeys[4], (n,n)) * hfactor,
+            'bias_fh'  : jr.normal(skeys[5], (n,)) * hfactor,
+            'weights_gu' : jr.normal(skeys[6], (n,lstm_inp)) * ifactor,
+            'weights_gh' : jr.normal(skeys[7], (n,n)) * hfactor,
+            'bias_gh'  : jr.normal(skeys[8], (n,)) * hfactor,
+            'weights_ou' : jr.normal(skeys[9], (n,lstm_inp)) * ifactor,
+            'weights_oh' : jr.normal(skeys[10], (n,n)) * hfactor,
+            'bias_oh'  : jr.normal(skeys[11], (n,)) * hfactor,
+            'readout_weights' : jr.normal(skeys[12], (o,n)) * pfactor}
+    if embed_size is not None:
+        params['embedding_weights'] = jr.normal(skeys[13], (n_embeds, embed_size))
+
+    return params
