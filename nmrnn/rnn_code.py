@@ -223,6 +223,8 @@ def batched_context_nm_rnn_loss_frozen(nm_params, other_params, x0, z0, task_inp
     params = dict(nm_params, **other_params)
     return batched_context_nm_rnn_loss(params, x0, z0, task_inputs, context_inputs, tau_x, tau_z, targets, loss_masks, orth_u=orth_u)
 
+
+############### CODE FOR LSTM
 def simple_lstm(params, c0, h0, inputs, gate_fn=jax.nn.sigmoid, activation_fn=jnp.tanh):
     """
     Arguments:
@@ -302,3 +304,38 @@ def initialize_carry(hidden_size, key):
     h = jr.normal(key2, mem_shape) * scale_factor
     carry = (c, h)
     return carry
+
+
+########### CODE FOR VANILLA RNN
+def rnn(params, x0, inputs, tau, nln=jnp.tanh):
+    """
+    Arguments:
+    - params
+    - x0
+    - inputs
+    - tau   : decay constant
+    """
+
+    W = params["recurrent_weights"]       # D x D
+    B = params["input_weights"]     # D x M
+    C = params["readout_weights"]   # O x D
+    rb = params["readout_bias"]             # O
+
+    N = x0.shape[0]
+
+    def _step(x, u):
+        h = nln(x)
+        x = (1.0 - (1. / tau)) * x + (1. / (tau * N)) * W @ h # divide by N
+        x += (1. / tau) * B @ u
+        y = C @ x + rb
+        return x, (y, x)
+
+    _, (ys, xs) = lax.scan(_step, x0, inputs)
+
+    return ys, xs
+
+batched_rnn = vmap(rnn, in_axes=(None, None, 0, None))
+
+def batched_rnn_loss(params, x0, batch_inputs, tau, batch_targets, batch_mask):
+    ys, _ = batched_rnn(params, x0,batch_inputs, tau)
+    return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)
