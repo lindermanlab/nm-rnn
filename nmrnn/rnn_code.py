@@ -339,3 +339,8 @@ batched_rnn = vmap(rnn, in_axes=(None, None, 0, None))
 def batched_rnn_loss(params, x0, batch_inputs, tau, batch_targets, batch_mask):
     ys, _ = batched_rnn(params, x0,batch_inputs, tau)
     return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)
+
+# for training on only subset of params
+def batched_rnn_loss_split(input_params, other_params, x0, inputs, tau_x, targets, loss_masks):
+    params = dict(input_params, **other_params)
+    return batched_rnn_loss(params, x0, inputs, tau_x, targets, loss_masks)
