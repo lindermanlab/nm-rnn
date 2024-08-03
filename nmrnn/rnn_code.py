@@ -305,6 +305,9 @@ def initialize_carry(hidden_size, key):
     carry = (c, h)
     return carry
 
+def batched_lstm_loss_split(input_params, other_params, c0, h0, inputs, targets):
+    params = dict(input_params, **other_params)
+    return lstm_batched_loss(params, c0, h0, inputs, targets)
 
 ########### CODE FOR VANILLA RNN
 def rnn(params, x0, inputs, tau, nln=jnp.tanh):
