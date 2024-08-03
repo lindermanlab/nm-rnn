@@ -1,4 +1,4 @@
-# this script trains a vanilla RNN in the multitask setting
+# this script trains a low-rank RNN in the multitask setting
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 import wandb
 
 from nmrnn.data_generation import sample_memory_pro, sample_memory_anti, sample_delay_pro, sample_delay_anti, sample_dm1, sample_dm2, random_trials, one_of_each
-from nmrnn.util import random_rnn_params, log_wandb_model, percent_correct
-from nmrnn.fitting import fit_rnn_mwg, fit_rnn_inputweights_only
-from nmrnn.rnn_code import batched_rnn, rnn
+from nmrnn.util import random_lstm_params, log_wandb_model, percent_correct
+from nmrnn.fitting import fit_lstm_mwg, fit_lstm_inputweights_only
+from nmrnn.rnn_code import batched_simple_lstm, simple_lstm, initialize_carry
 
 # parameters we want to track in wandb
 default_config = dict(
@@ -47,7 +47,7 @@ default_config = dict(
 )
 
 # wandb stuff
-projectname = "multitask-rnn"
+projectname = "multitask-lstm"
 wandb.init(config=default_config, project=projectname, entity='nm-rnn')
 config = wandb.config
 
@@ -85,27 +85,26 @@ optimizer = optax.chain(
   optax.adamw(learning_rate=1e-3),
 )
 
-x0 = jnp.ones((config['N'],))*0.1
-masks = jnp.ones_like(samples_out)
-
 # generate random initial parameters
-init_params = random_rnn_params(key, config['U'], config['N'], config['O'])
+init_params = random_lstm_params(key, config['U'], config['N'], config['O'])
+init_carry = initialize_carry(config['N'], key)
+c0, h0 = jnp.zeros_like(init_carry[0]), jnp.zeros_like(init_carry[1])
+init_carry = (c0, h0)
 
 # train on all params
-params, losses = fit_rnn_mwg(samples_in.transpose((0,2,1)), 
-                                samples_out.transpose((0,2,1)), 
-                                masks.transpose((0,2,1)),
+params, losses = fit_lstm_mwg(samples_in.transpose((0,2,1)), 
+                                samples_out.transpose((0,2,1)),
                                 init_params, 
                                 optimizer, 
-                                x0, 
-                                config['num_full_train_iters'],
-                                config['tau'], 
+                                init_carry, 
+                                config['num_full_train_iters'], 
                                 wandb_log=True, 
                                 batch=config['batch'],
-                                batch_size=config['batch_size'])
+                                batch_size=config['batch_size'],
+                                keyind=config['keyind'])
 
 # log model
-log_wandb_model(params, "multitask_context_rnn_n{}".format(config['N']), 'model')
+log_wandb_model(params, "multitask_lstm_n{}".format(config['N']), 'model')
 
 # log % correct
 # TODO: currently only works for memory anti held-out
@@ -117,20 +116,20 @@ x0 = jnp.ones((config['N'],))*0.1
 task_samples_in_test = samples_in_test[:,:-3, :]
 context_samples_in_test = samples_in_test[:,-3:, :]
 
-ys_test, _ = batched_rnn(params, x0, samples_in_test.transpose((0,2,1)), config['tau'])
+_, ys_test = batched_simple_lstm(params, c0, h0, samples_in_test.transpose((0,2,1)))
 
 wandb.log({'percent_correct_threetask_test':percent_correct(samples_in_test, samples_out_test, ys_test)})
 
 
 # example outputs plot
-sample_inputs, sample_targets, sample_masks = samples_in.transpose((0,2,1))[0], samples_out.transpose((0,2,1))[0], masks.transpose((0,2,1))[0] # grab a single trial to plot output
+sample_inputs, sample_targets = samples_in.transpose((0,2,1))[0], samples_out.transpose((0,2,1))[0] # grab a single trial to plot output
 
-ys, _ = rnn(params, x0, sample_inputs, config['tau'])
+ys, _ = simple_lstm(params, c0, h0, sample_inputs)
 
 fig, ax = plt.subplots(1, 1, figsize=[10, 6])
 # ax0.xlabel('Timestep')
 ax.plot(sample_targets, label='True target')
-ax.plot(ys, label='RNN target')
+ax.plot(ys, label='LSTM target')
 ax.legend()
 ax.set_xlabel('Timestep')
 wandb.log({'final_curves':wandb.Image(fig)}, commit=True)
@@ -152,7 +151,10 @@ samples_in_heldout = samples_in_heldout.at[:,:3,:].set(samples_in[:,:3,:]) # sen
 samples_in_heldout = samples_in_heldout.at[:,3:-1,:].set(config['input_noise_sigma']*jr.normal(jr.PRNGKey(config['keyind']),samples_in_heldout[:,3:-1,:].shape)) # add noise to new channels
 samples_in_heldout = samples_in_heldout.at[:,-1,:].set(samples_in[:,-1,:]) # add new one-hot input for new task
 
-params['input_weights'] = jnp.hstack((params['input_weights'], 0.1*jnp.ones((config['N'],1))))
+params['weights_iu'] = jnp.hstack((params['weights_iu'], 0.1*jnp.ones((config['N'],1))))
+params['weights_fu'] = jnp.hstack((params['weights_fu'], 0.1*jnp.ones((config['N'],1))))
+params['weights_gu'] = jnp.hstack((params['weights_gu'], 0.1*jnp.ones((config['N'],1))))
+params['weights_ou'] = jnp.hstack((params['weights_ou'], 0.1*jnp.ones((config['N'],1))))
 
 key = jr.PRNGKey(config['keyind'])
 
@@ -163,30 +165,25 @@ optimizer = optax.chain(
   optax.adamw(learning_rate=config['retrain_lr']),
 )
 
-x0 = jnp.ones((config['N'],))*0.1
-masks = jnp.ones_like(samples_out)
+input_params = {k: params[k] for k in ('weights_iu', 'weights_fu', 'weights_gu', 'weights_ou')}
+other_params = {k: params[k] for k in ('weights_ih', 'bias_ih', 'weights_fh', 'bias_fh', 'weights_gh', 'bias_gh', 'weights_oh', 'bias_oh', 'readout_weights')}
 
-input_params = {k: params[k] for k in ['input_weights']}
-other_params = {k: params[k] for k in ('recurrent_weights', 'readout_bias', 'readout_weights')}
-
-params, input_only_losses = fit_rnn_inputweights_only(samples_in_heldout.transpose((0,2,1)),
+params, input_only_losses = fit_lstm_inputweights_only(samples_in_heldout.transpose((0,2,1)),
                                              samples_out.transpose((0,2,1)), 
-                                             masks.transpose((0,2,1)), 
                                              input_params,
                                              other_params,
                                              optimizer, 
-                                             x0, 
+                                             init_carry, 
                                              config['retrain_iters'],
-                                             config['tau'], 
                                              wandb_log=True,
                                              batch=config['batch'], 
                                              batch_size=config['batch_size'], 
                                              keyind=config['keyind'])
 
-log_wandb_model(params, "multitask_context_rnn_n{}_retrained".format(config['N']), 'model')
+log_wandb_model(params, "multitask_context_lstm_n{}_retrained".format(config['N']), 'model')
 
 # calc percent correct on trained datapoints
-ys_test, _ = batched_rnn(params, x0, samples_in_heldout.transpose((0,2,1)), config['tau'])
+_, ys_test = batched_simple_lstm(params, c0, h0, samples_in_heldout.transpose((0,2,1)))
 
 wandb.log({'percent_correct_heldouttask_train':percent_correct(samples_in, samples_out, ys_test)})
 
@@ -194,8 +191,7 @@ wandb.log({'percent_correct_heldouttask_train':percent_correct(samples_in, sampl
 samples_in_test = jnp.load('test_inputs.npy')[75:]
 samples_out_test = jnp.load('test_outputs.npy')[75:]
 samples_labels_test = jnp.load('test_labels.npy')[75:]
-x0 = jnp.ones((config['N'],))*0.1
 
-ys_test, _ = batched_rnn(params, x0, samples_in_test.transpose((0,2,1)), config['tau'])
+_, ys_test = batched_simple_lstm(params, c0, h0, samples_in_test.transpose((0,2,1)))
 
 wandb.log({'percent_correct_heldouttask_test':percent_correct(samples_in_test, samples_out_test, ys_test)})
