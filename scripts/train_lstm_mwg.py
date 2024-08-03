@@ -54,6 +54,8 @@ optimizer = optax.chain(
 # generate random initial parameters
 init_params = random_lstm_params(key, config['U'], config['N'], config['O'])
 init_carry = initialize_carry(config['N'], key)
+c0, h0 = jnp.zeros_like(init_carry[0]), jnp.zeros_like(init_carry[1])
+init_carry = (c0, h0)
 
 # train on all params
 params, losses = fit_lstm_mwg(all_inputs, all_outputs, init_params, optimizer, 
