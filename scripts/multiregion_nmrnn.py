@@ -403,3 +403,22 @@ for idx, name in enumerate(['BG (direct)', 'BG (indirect)']):
 plt.suptitle('aligned to go')
 plt.tight_layout()
 wandb.log({'bg_split_go':wandb.Image(fig)}, commit=True)
+
+
+ys, xs, zs = batched_nm_rnn(params_nm, x0, z0, all_inputs, config['tau_x'], config['tau_z'], True)
+fig, ax = plt.subplots(1, 1, figsize=(5, 4))
+plt.plot(all_outputs[:,:,0].T, linestyle='--', c='k', alpha=0.5)
+plt.plot(ys[:2,:,0].T, c='tab:red')
+plt.plot(ys[2:6,:,0].T, c='tab:purple')
+plt.plot(ys[6:,:,0].T, c='tab:blue')
+plt.title('outputs')
+wandb.log({'outputs':wandb.Image(fig)}, commit=True)
+
+ys, xs, zs = batched_nm_rnn(params_nm, x0, z0, all_inputs, config['tau_x'], config['tau_z'], False)
+fig, ax = plt.subplots(1, 1, figsize=(5, 4))
+plt.plot(all_outputs[:,:,0].T, linestyle='--', c='k', alpha=0.5)
+plt.plot(ys[:2,:,0].T, c='tab:red')
+plt.plot(ys[2:6,:,0].T, c='tab:purple')
+plt.plot(ys[6:,:,0].T, c='tab:blue')
+plt.title('outputs (remove modulation)')
+wandb.log({'outputs_remove_nm':wandb.Image(fig)}, commit=True)
