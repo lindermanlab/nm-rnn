@@ -284,10 +284,6 @@ projectname = "multiregion-nm-rnn"
 wandb.init(config=default_config, project=projectname, entity='nm-rnn')
 config = wandb.config
 
-# projectname = "nm-rnn-mwg"
-# wandb.init(config=default_config, project=projectname, entity='nm-rnn')
-config = default_config
-
 all_inputs, all_outputs, all_masks = mwg_tasks(config['T'],
            jnp.array(config['intervals']),
             config['measure_min'],
