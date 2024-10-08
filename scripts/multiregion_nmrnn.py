@@ -179,7 +179,6 @@ def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_i
         losses.append(loss_values)
         print(f'step {(n+1)*200}, loss: {loss_values[-1]}')
         if wandb_log: wandb.log({'loss':loss_values[-1]})
-        if wandb_log: wandb.log({'loss':loss_values[-1]})
         if loss_values[-1] < best_loss:
             best_params = params
             best_loss = loss_values[-1]
