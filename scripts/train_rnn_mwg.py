@@ -52,7 +52,7 @@ key = jr.PRNGKey(config['keyind'])
 # optimizer = optax.adam(learning_rate=1e-3)
 optimizer = optax.chain(
   optax.clip(1.0), # gradient clipping
-  optax.adamw(learning_rate=1e-2),
+  optax.adamw(learning_rate=1e-3),
 )
 
 x0 = jnp.ones((config['N'],))*0.1
