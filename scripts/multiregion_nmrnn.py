@@ -9,6 +9,8 @@ import optax
 import matplotlib.pyplot as plt
 import wandb
 
+from nmrnn.util import log_wandb_model
+
 def init_params(key, n_bg, n_nm, g_bg, g_nm, input_dim, output_dim):
     # for now assume Th/BG/C are same size, g is the same for all weight matrices
     skeys = jr.split(key, 17)
@@ -76,22 +78,21 @@ def multiregion_nmrnn(params, x_0, z_0, inputs, tau_x, tau_z, modulation=True):
     x_nm0 = z_0
 
     J_bg = params['J_bg']
+    # J_bg, _ = jnp.linalg.qr(J_bg)
     B_bgc = params['B_bgc']
     J_c = params['J_c']
+    # J_c, _ = jnp.linalg.qr(J_c)
     B_cu = params['B_cu']
     B_ct = params['B_ct']
     J_t = params['J_t']
+    # J_t, _ = jnp.linalg.qr(J_t)
     B_tbg = params['B_tbg']
     J_nm = params['J_nm']
-    J_nmc = params['J_nmc']
     B_nmc = params['B_nmc']
     m = params['m']
     c = params['c']
     C = params['C']
     rb = params['rb']
-    U = params['U']
-    V_bg = params['V_bg']
-    V_c = params['V_c']
 
     tau_c = tau_x
     tau_bg = tau_x
@@ -110,11 +111,13 @@ def multiregion_nmrnn(params, x_0, z_0, inputs, tau_x, tau_z, modulation=True):
 
     def _step(x_and_z, u):
         x_bg, x_c, x_t, x_nm = x_and_z
+        # could also parameterize weight matrices via singular values (passed through sigmoid)
+        # thalamus: diagonal recurrence?
 
         # update x_c
-        x_c = (1.0 - (1. / tau_c)) * x_c + (1. / tau_c) * J_c @ nln(x_c) # recurrent dynamics
-        x_c += (1. / tau_c) * B_cu @ u # external inputs
-        x_c += (1. / tau_c) * exc(B_ct) @ x_t # input from thalamus, excitatory
+        x_c_new = (1.0 - (1. / tau_c)) * x_c + (1. / tau_c) * J_c @ nln(x_c) # recurrent dynamics
+        x_c_new += (1. / tau_c) * B_cu @ u # external inputs
+        x_c_new += (1. / tau_c) * exc(B_ct) @ x_t # input from thalamus, excitatory
 
         # update x_bg
         num_bg_cells = J_bg.shape[0]
@@ -132,20 +135,23 @@ def multiregion_nmrnn(params, x_0, z_0, inputs, tau_x, tau_z, modulation=True):
             G_bg = jnp.ones((num_bg_cells, num_bg_cells))
             G_c = jnp.ones((num_bg_cells, num_c_cells))
 
-        x_bg = (1.0 - (1. / tau_bg)) * x_bg + (1. / tau_bg) * (G_bg * inh(J_bg)) @ nln(x_bg) # recurrent dynamics, inhibitory
-        x_bg += (1. / tau_bg) * (G_c * exc(B_bgc)) @ x_c # input from cortex, excitatory
+        x_bg_new = (1.0 - (1. / tau_bg)) * x_bg + (1. / tau_bg) * (G_bg * inh(J_bg)) @ nln(x_bg) # recurrent dynamics, inhibitory
+        x_bg_new += (1. / tau_bg) * (G_c * exc(B_bgc)) @ x_c # input from cortex, excitatory
 
         # update x_t
-        x_t = (1.0 - (1. / tau_t)) * x_t + (1. / tau_t) * J_t @ nln(x_t) # recurrent dynamics
+        x_t_new = (1.0 - (1. / tau_t)) * x_t #+ (1. / tau_t) * J_t @ nln(x_t)
+        # x_t_new = (1.0 - (1. / tau_t)) * x_t + (1. / tau_t) * J_t @ nln(x_t) # recurrent dynamics
+        # B_tbg_eff = jnp.concatenate((exc(B_tbg[:, :num_bg_cells//2]), inh(B_tbg[:, num_bg_cells//2:])), axis=1)
+        # x_t_new += (1. / tau_t) * B_tbg_eff @ x_bg # input from BG, excitatory/inhibitory
         x_t += (1. / tau_t) * inh(B_tbg) @ x_bg # input from BG, inhibitory
 
         # update x_nm
-        x_nm = (1.0 - (1. / tau_nm)) * x_nm + (1. / tau_nm) * J_nm @ nln(x_nm)
-        x_nm += (1. / tau_nm) * exc(B_nmc) @ x_c # input from cortex, excitatory
+        x_nm_new = (1.0 - (1. / tau_nm)) * x_nm + (1. / tau_nm) * J_nm @ nln(x_nm)
+        x_nm_new += (1. / tau_nm) * exc(B_nmc) @ x_c # input from cortex, excitatory
 
         # calculate y
         y = C @ x_bg + rb # output from BG
-        return (x_bg, x_c, x_t, x_nm), (y, x_bg, x_c, x_t, x_nm)
+        return (x_bg_new, x_c_new, x_t_new, x_nm_new), (y, x_bg_new, x_c_new, x_t_new, x_nm_new)
 
     _, (y, x_bg, x_c, x_t, x_nm) = lax.scan(_step, (x_bg0, x_c0, x_t0, x_nm0), inputs)
 
@@ -321,6 +327,8 @@ params_nm, losses_nm = fit_mwg_nm_rnn(all_inputs, all_outputs, all_masks,
                                 params, optimizer, x0, z0, config['num_full_train_iters'],
                                 config['tau_x'], config['tau_z'], wandb_log=True, modulation=True)
 
+log_wandb_model(params, "multiregion_nmrnn_n{}_m{}".format(config['n_bg'], config['n_nm']), 'model')
+
 all_inputs, all_outputs, all_masks = mwg_tasks(config['T'],
            jnp.array([[8, 10, 12, 14, 16, 18, 20, 22]]),
             15, 16,
@@ -422,3 +430,6 @@ plt.plot(ys[2:6,:,0].T, c='tab:purple')
 plt.plot(ys[6:,:,0].T, c='tab:blue')
 plt.title('outputs (remove modulation)')
 wandb.log({'outputs_remove_nm':wandb.Image(fig)}, commit=True)
+
+
+# plot J_bg and G_bg, G_c
