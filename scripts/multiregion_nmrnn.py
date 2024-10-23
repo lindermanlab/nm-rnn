@@ -146,8 +146,11 @@ def multiregion_nmrnn(params, x_0, z_0, inputs, tau_x, tau_z, modulation=True):
         x_t += (1. / tau_t) * inh(B_tbg) @ x_bg # input from BG, inhibitory
 
         # update x_nm
-        x_nm_new = (1.0 - (1. / tau_nm)) * x_nm + (1. / tau_nm) * J_nm @ nln(x_nm)
-        x_nm_new += (1. / tau_nm) * exc(B_nmc) @ x_c # input from cortex, excitatory
+        if modulation:
+            x_nm_new = (1.0 - (1. / tau_nm)) * x_nm + (1. / tau_nm) * J_nm @ nln(x_nm)
+            x_nm_new += (1. / tau_nm) * exc(B_nmc) @ x_c # input from cortex, excitatory
+        else:
+            x_nm_new = x_nm
 
         # calculate y
         y = C @ x_bg + rb # output from BG
@@ -159,19 +162,19 @@ def multiregion_nmrnn(params, x_0, z_0, inputs, tau_x, tau_z, modulation=True):
 
 batched_nm_rnn = vmap(multiregion_nmrnn, in_axes=(None, None, None, 0, None, None, None))
 
-def batched_nm_rnn_loss(params, x0, z0, batch_inputs, tau_x, tau_z, batch_targets, batch_mask, orth_u=True, modulation=True):
+def batched_nm_rnn_loss(params, x0, z0, batch_inputs, tau_x, tau_z, batch_targets, batch_mask, modulation=True):
     ys, _, _ = batched_nm_rnn(params, x0, z0, batch_inputs, tau_x, tau_z, modulation) # removed orth_u from here
     return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)
 
 def fit_mwg_nm_rnn(inputs, targets, loss_masks, params, optimizer, x0, z0, num_iters, tau_x, tau_z,
-                   wandb_log=False, orth_u=True, modulation=True, log_interval=200): # training on full set of data
+                   wandb_log=False, modulation=True, log_interval=200): # training on full set of data
     opt_state = optimizer.init(params)
     N_data = inputs.shape[0]
 
     @jit
     def _step(params_and_opt, input):
         (params, opt_state) = params_and_opt
-        loss_value, grads = jax.value_and_grad(batched_nm_rnn_loss)(params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks, orth_u=orth_u, modulation=modulation)
+        loss_value, grads = jax.value_and_grad(batched_nm_rnn_loss)(params, x0, z0, inputs, tau_x, tau_z, targets, loss_masks, modulation=modulation)
         updates, opt_state = optimizer.update(grads, opt_state, params)
         params = optax.apply_updates(params, updates)
         return (params, opt_state), (params, loss_value)
@@ -271,6 +274,7 @@ default_config = dict(
     # Model Hyperparameters
     tau_x = 10,
     tau_z = 100,
+    modulation = True,
     # Timing (task) parameters
     dt = 10, # ms
     # Data Generation
@@ -325,9 +329,9 @@ params = init_params(
 # train on all params
 params_nm, losses_nm = fit_mwg_nm_rnn(all_inputs, all_outputs, all_masks,
                                 params, optimizer, x0, z0, config['num_full_train_iters'],
-                                config['tau_x'], config['tau_z'], wandb_log=True, modulation=True)
+                                config['tau_x'], config['tau_z'], wandb_log=True, modulation=config['modulation'])
 
-log_wandb_model(params_nm, "multiregion_nmrnn_n{}_m{}".format(config['n_bg'], config['n_nm']), 'model')
+log_wandb_model(params_nm, "multiregion_nmrnn_n{}_m{}_mod{}".format(config['n_bg'], config['n_nm'], config['modulation']), 'model')
 
 all_inputs, all_outputs, all_masks = mwg_tasks(config['T'],
            jnp.array([[8, 10, 12, 14, 16, 18, 20, 22]]),
@@ -353,7 +357,7 @@ def align_to_go(data, inputs):
     return new_data
 
 fig, ax = plt.subplots(4, 1, figsize=(3,8))
-ys, xs, zs = batched_nm_rnn(params_nm, x0, z0, all_inputs, config['tau_x'], config['tau_z'], True)
+ys, xs, zs = batched_nm_rnn(params_nm, x0, z0, all_inputs, config['tau_x'], config['tau_z'], config['modulation'])
 for idx, name in enumerate(['BG', 'Cortex', 'Thalamus', 'SNc']):
     mean_act = jnp.mean(xs[idx], axis=2) if idx < 3 else jnp.mean(zs, axis=2)
     ax[idx].axvline(x=15, c='k', ls='--', alpha=0.7)
@@ -383,7 +387,6 @@ plt.tight_layout()
 wandb.log({'four_regions_go':wandb.Image(fig)}, commit=True)
 
 fig, ax = plt.subplots(1, 2, figsize=(6,3))
-ys, xs, zs = batched_nm_rnn(params_nm, x0, z0, all_inputs, config['tau_x'], config['tau_z'], True)
 for idx, name in enumerate(['BG (direct)', 'BG (indirect)']):
     mean_act = jnp.mean(xs[0][:,:,10*idx:10*(idx+1)], axis=2)
     ax[idx].axvline(x=15, c='k', ls='--', alpha=0.7)
@@ -413,7 +416,6 @@ plt.tight_layout()
 wandb.log({'bg_split_go':wandb.Image(fig)}, commit=True)
 
 
-ys, xs, zs = batched_nm_rnn(params_nm, x0, z0, all_inputs, config['tau_x'], config['tau_z'], True)
 fig, ax = plt.subplots(1, 1, figsize=(5, 4))
 plt.plot(all_outputs[:,:,0].T, linestyle='--', c='k', alpha=0.5)
 plt.plot(ys[:2,:,0].T, c='tab:red')
@@ -422,7 +424,7 @@ plt.plot(ys[6:,:,0].T, c='tab:blue')
 plt.title('outputs')
 wandb.log({'outputs':wandb.Image(fig)}, commit=True)
 
-ys, xs, zs = batched_nm_rnn(params_nm, x0, z0, all_inputs, config['tau_x'], config['tau_z'], False)
+ys, xs, zs = batched_nm_rnn(params_nm, x0, z0, all_inputs, config['tau_x'], config['tau_z'], modulation=False)
 fig, ax = plt.subplots(1, 1, figsize=(5, 4))
 plt.plot(all_outputs[:,:,0].T, linestyle='--', c='k', alpha=0.5)
 plt.plot(ys[:2,:,0].T, c='tab:red')
