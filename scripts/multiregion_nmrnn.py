@@ -327,7 +327,7 @@ params_nm, losses_nm = fit_mwg_nm_rnn(all_inputs, all_outputs, all_masks,
                                 params, optimizer, x0, z0, config['num_full_train_iters'],
                                 config['tau_x'], config['tau_z'], wandb_log=True, modulation=True)
 
-log_wandb_model(params, "multiregion_nmrnn_n{}_m{}".format(config['n_bg'], config['n_nm']), 'model')
+log_wandb_model(params_nm, "multiregion_nmrnn_n{}_m{}".format(config['n_bg'], config['n_nm']), 'model')
 
 all_inputs, all_outputs, all_masks = mwg_tasks(config['T'],
            jnp.array([[8, 10, 12, 14, 16, 18, 20, 22]]),
