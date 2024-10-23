@@ -347,3 +347,107 @@ def batched_rnn_loss(params, x0, batch_inputs, tau, batch_targets, batch_mask):
 def batched_rnn_loss_split(input_params, other_params, x0, inputs, tau_x, targets, loss_masks):
     params = dict(input_params, **other_params)
     return batched_rnn_loss(params, x0, inputs, tau_x, targets, loss_masks)
+
+
+def multiregion_nmrnn(params, x_0, z_0, inputs, tau_x, tau_z, modulation=True):
+    """
+    Arguments:
+    - params
+    - x0
+    - inputs
+    - tau   : decay constant
+    """
+
+    # unpack params (TODO)
+    x_bg0, x_c0, x_t0 = x_0
+    x_nm0 = z_0
+
+    J_bg = params['J_bg']
+    # J_bg, _ = jnp.linalg.qr(J_bg)
+    B_bgc = params['B_bgc']
+    J_c = params['J_c']
+    # J_c, _ = jnp.linalg.qr(J_c)
+    B_cu = params['B_cu']
+    B_ct = params['B_ct']
+    J_t = params['J_t']
+    # J_t, _ = jnp.linalg.qr(J_t)
+    B_tbg = params['B_tbg']
+    J_nm = params['J_nm']
+    B_nmc = params['B_nmc']
+    m = params['m']
+    c = params['c']
+    C = params['C']
+    rb = params['rb']
+
+    tau_c = tau_x
+    tau_bg = tau_x
+    tau_t = tau_x
+    tau_nm = tau_z
+
+    def nln(x):
+        # return jnp.maximum(0, x)
+        return jnp.tanh(x)
+
+    def exc(w):
+        return jnp.abs(w)
+
+    def inh(w):
+        return -jnp.abs(w)
+
+    def _step(x_and_z, u):
+        x_bg, x_c, x_t, x_nm = x_and_z
+        # could also parameterize weight matrices via singular values (passed through sigmoid)
+        # thalamus: diagonal recurrence?
+
+        # update x_c
+        x_c_new = (1.0 - (1. / tau_c)) * x_c + (1. / tau_c) * J_c @ nln(x_c) # recurrent dynamics
+        x_c_new += (1. / tau_c) * B_cu @ u # external inputs
+        x_c_new += (1. / tau_c) * exc(B_ct) @ x_t # input from thalamus, excitatory
+
+        # update x_bg
+        num_bg_cells = J_bg.shape[0]
+        num_c_cells = J_c.shape[0]
+
+        if modulation:
+            #TODO: will error out if num_bg_cells isn't even / add initializations
+            U = jnp.concatenate((jnp.ones((num_bg_cells//2, 1)), -1*jnp.ones((num_bg_cells//2, 1)))) # direct/indirect
+            V_bg = jnp.ones((num_bg_cells, 1))
+            V_c = jnp.ones((num_c_cells, 1))
+            s = jax.nn.sigmoid(m @ x_nm + c) # neuromodulatory signal (1D for now)
+            G_bg = jnp.exp(s * U @ V_bg.T) # TODO: change to matrix U,V + vector s (for multidimensional NM)
+            G_c = jnp.exp(s * U @ V_c.T) # num_bg_cells x num_c_cells
+        else:
+            G_bg = jnp.ones((num_bg_cells, num_bg_cells))
+            G_c = jnp.ones((num_bg_cells, num_c_cells))
+
+        x_bg_new = (1.0 - (1. / tau_bg)) * x_bg + (1. / tau_bg) * (G_bg * inh(J_bg)) @ nln(x_bg) # recurrent dynamics, inhibitory
+        x_bg_new += (1. / tau_bg) * (G_c * exc(B_bgc)) @ x_c # input from cortex, excitatory
+
+        # update x_t
+        x_t_new = (1.0 - (1. / tau_t)) * x_t # remove recurrent dynamics
+        # x_t_new = (1.0 - (1. / tau_t)) * x_t + (1. / tau_t) * J_t @ nln(x_t) # recurrent dynamics
+        B_tbg_eff = jnp.concatenate((exc(B_tbg[:, :num_bg_cells//2]), inh(B_tbg[:, num_bg_cells//2:])), axis=1)
+        x_t_new += (1. / tau_t) * B_tbg_eff @ x_bg # input from BG, excitatory/inhibitory
+        # x_t += (1. / tau_t) * inh(B_tbg) @ x_bg # input from BG, inhibitory
+
+        # update x_nm
+        if modulation:
+            x_nm_new = (1.0 - (1. / tau_nm)) * x_nm + (1. / tau_nm) * J_nm @ nln(x_nm)
+            x_nm_new += (1. / tau_nm) * exc(B_nmc) @ x_c # input from cortex, excitatory
+        else:
+            x_nm_new = x_nm
+
+        # calculate y
+        C_eff = jnp.concatenate((exc(C[:, :num_bg_cells//2]), inh(C[:, num_bg_cells//2:])), axis=1)
+        y = C_eff @ x_bg + rb # output from BG
+        return (x_bg_new, x_c_new, x_t_new, x_nm_new), (y, x_bg_new, x_c_new, x_t_new, x_nm_new)
+
+    _, (y, x_bg, x_c, x_t, x_nm) = lax.scan(_step, (x_bg0, x_c0, x_t0, x_nm0), inputs)
+
+    return y, (x_bg, x_c, x_t), x_nm
+
+batched_multiregion_nm_rnn = vmap(multiregion_nmrnn, in_axes=(None, None, None, 0, None, None, None))
+
+def batched_multiregion_nm_rnn_loss(params, x0, z0, batch_inputs, tau_x, tau_z, batch_targets, batch_mask, modulation=True):
+    ys, _, _ = batched_nm_rnn(params, x0, z0, batch_inputs, tau_x, tau_z, modulation) # removed orth_u from here
+    return jnp.sum(((ys - batch_targets)**2)*batch_mask)/jnp.sum(batch_mask)

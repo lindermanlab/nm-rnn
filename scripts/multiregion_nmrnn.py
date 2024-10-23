@@ -139,11 +139,11 @@ def multiregion_nmrnn(params, x_0, z_0, inputs, tau_x, tau_z, modulation=True):
         x_bg_new += (1. / tau_bg) * (G_c * exc(B_bgc)) @ x_c # input from cortex, excitatory
 
         # update x_t
-        x_t_new = (1.0 - (1. / tau_t)) * x_t #+ (1. / tau_t) * J_t @ nln(x_t)
+        x_t_new = (1.0 - (1. / tau_t)) * x_t # remove recurrent dynamics
         # x_t_new = (1.0 - (1. / tau_t)) * x_t + (1. / tau_t) * J_t @ nln(x_t) # recurrent dynamics
-        # B_tbg_eff = jnp.concatenate((exc(B_tbg[:, :num_bg_cells//2]), inh(B_tbg[:, num_bg_cells//2:])), axis=1)
-        # x_t_new += (1. / tau_t) * B_tbg_eff @ x_bg # input from BG, excitatory/inhibitory
-        x_t += (1. / tau_t) * inh(B_tbg) @ x_bg # input from BG, inhibitory
+        B_tbg_eff = jnp.concatenate((exc(B_tbg[:, :num_bg_cells//2]), inh(B_tbg[:, num_bg_cells//2:])), axis=1)
+        x_t_new += (1. / tau_t) * B_tbg_eff @ x_bg # input from BG, excitatory/inhibitory
+        # x_t += (1. / tau_t) * inh(B_tbg) @ x_bg # input from BG, inhibitory
 
         # update x_nm
         if modulation:
@@ -153,7 +153,8 @@ def multiregion_nmrnn(params, x_0, z_0, inputs, tau_x, tau_z, modulation=True):
             x_nm_new = x_nm
 
         # calculate y
-        y = C @ x_bg + rb # output from BG
+        C_eff = jnp.concatenate((exc(C[:, :num_bg_cells//2]), inh(C[:, num_bg_cells//2:])), axis=1)
+        y = C_eff @ x_bg + rb # output from BG
         return (x_bg_new, x_c_new, x_t_new, x_nm_new), (y, x_bg_new, x_c_new, x_t_new, x_nm_new)
 
     _, (y, x_bg, x_c, x_t, x_nm) = lax.scan(_step, (x_bg0, x_c0, x_t0, x_nm0), inputs)
